@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NoonChi</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&family=Neue+Haas+Grotesk+Display+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <!-- NAV -->
+    <nav id="global-nav">
+      <div class="nav-inner">
+        <div class="nav-logo" onclick="showView('setup')">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.2" />
+            <circle cx="10" cy="10" r="5" fill="currentColor" opacity="0.3" />
+            <circle cx="10" cy="10" r="2" fill="currentColor" />
+          </svg>NoonChi
+        </div>
+        <div class="nav-links">
+          <button class="nav-link active" data-view="setup" onclick="showView('setup')">집중</button>
+          <button class="nav-link" data-view="report" onclick="showView('report')">리포트</button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- VIEW: SETUP -->
+    <div id="view-setup" class="view active">
+      <!-- Hero Section -->
+      <section class="hero-section">
+        <div class="hero-eyebrow">AI 기반 집중도 측정</div>
+        <h1 class="hero-title">
+          집중이<br />
+          <em>시작되는 곳</em>
+        </h1>
+        <p class="hero-sub">
+          카메라가 시선과 자세를 실시간으로 분석합니다.<br />집중한 시간을 기록하고, 성장을 확인하세요.
+        </p>
+
+        <div class="hero-cta">
+          <button class="btn-hero" id="btn-start">집중 시작</button>
+        </div>
+
+        <!-- Scroll indicator -->
+        <div class="scroll-hint">
+          <span>설정하기</span>
+          <div class="scroll-arrow">↓</div>
+        </div>
+      </section>
+
+      <!-- Config Section -->
+      <section class="config-section">
+        <div class="config-inner">
+          <div class="config-block">
+            <div class="config-label">목표 시간</div>
+            <div class="config-display">
+              <span id="goal-display" class="config-value">30</span>
+              <span class="config-unit">분</span>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" id="goal-slider" min="5" max="120" step="5" value="30" class="slider-clean" />
+              <div class="slider-marks">
+                <span>5분</span><span>30분</span><span>60분</span><span>120분</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-divider"></div>
+
+          <div class="config-block">
+            <div class="config-label">민감도</div>
+            <div class="sens-group">
+              <button class="sens-pill" data-val="낮음">
+                <span class="sens-dot"></span>
+                낮음
+                <span class="sens-desc">편안하게</span>
+              </button>
+              <button class="sens-pill active" data-val="보통">
+                <span class="sens-dot"></span>
+                보통
+                <span class="sens-desc">균형 있게</span>
+              </button>
+              <button class="sens-pill" data-val="높음">
+                <span class="sens-dot"></span>
+                높음
+                <span class="sens-desc">엄격하게</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="config-divider"></div>
+
+          <div class="config-block config-start">
+            <button class="btn-config-start" id="btn-start-2">
+              <span>집중 시작</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- VIEW: FOCUS -->
+    <div id="view-focus" class="view">
+      <!-- Top bar -->
+      <div class="focus-bar">
+        <div class="focus-bar-left">
+          <div class="focus-logo">NoonChi</div>
+          <div id="status-pill" class="status-pill pill-noface">
+            <span class="pill-dot"></span>
+            <span id="status-text">얼굴 없음</span>
+          </div>
+        </div>
+        <div class="focus-bar-right">
+          <button class="focus-btn" id="btn-pause" onclick="togglePause()">
+            <svg id="pause-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="2" y="1" width="3.5" height="12" rx="1" fill="currentColor" />
+              <rect x="8.5" y="1" width="3.5" height="12" rx="1" fill="currentColor" />
+            </svg>
+            <span id="pause-label">일시정지</span>
+          </button>
+          <button class="focus-btn focus-btn-danger" onclick="resetSession()">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 7a5 5 0 1 0 1-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              <path d="M2 3v4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>초기화
+          </button>
+        </div>
+      </div>
+
+      <!-- Luminance toast -->
+      <div id="lum-toast" class="lum-toast hidden">⚠ 조도 변화 감지 — 판정 보류 중</div>
+
+      <!-- Main monitor layout -->
+      <div class="monitor-grid">
+        <!-- Camera feed — cinematic -->
+        <div class="cam-panel">
+          <img id="cam-feed" src="/video_feed" alt="카메라 피드" />
+          <div id="distract-overlay" class="distract-overlay hidden">
+            <div id="distract-reason" class="distract-msg"></div>
+          </div>
+          <!-- Focus state glow ring on camera -->
+          <div id="cam-state-ring" class="cam-ring"></div>
+        </div>
+
+        <!-- Stats sidebar -->
+        <div class="stats-sidebar">
+          <!-- Big ring -->
+          <div class="ring-module">
+            <svg class="ring-svg" viewBox="0 0 200 200">
+              <circle class="ring-bg" cx="100" cy="100" r="82" />
+              <circle id="ring-fill" class="ring-progress" cx="100" cy="100" r="82" stroke-dasharray="515.22" stroke-dashoffset="515.22" transform="rotate(-90 100 100)" />
+              <text id="ring-time" class="ring-time" x="100" y="92" text-anchor="middle">00:00</text>
+              <text id="ring-pct" class="ring-pct" x="100" y="118" text-anchor="middle">0%</text>
+              <text id="ring-goal" class="ring-goal" x="100" y="136" text-anchor="middle">/ 30분</text>
+            </svg>
+            <div class="ring-label">집중 시간</div>
+          </div>
+
+          <!-- Session time -->
+          <div class="stat-tile">
+            <div class="stat-tile-label">세션 경과</div>
+            <div class="stat-tile-val" id="session-time">00:00</div>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="stat-tile">
+            <div class="stat-tile-header">
+              <span class="stat-tile-label">목표 달성</span>
+              <span class="stat-tile-pct" id="prog-pct-label">0%</span>
+            </div>
+            <div class="prog-track">
+              <div id="prog-fill" class="prog-bar"></div>
+            </div>
+            <div id="prog-times" class="prog-sub">00:00 / 30:00</div>
+          </div>
+
+          <!-- Debug metrics — minimal -->
+          <div class="stat-tile stat-tile-debug">
+            <div class="stat-tile-label">실시간 측정</div>
+            <div class="debug-grid">
+              <span class="debug-key">EAR</span>
+              <span id="d-ear" class="debug-val">—</span>
+              <span class="debug-key">Pitch</span>
+              <span id="d-pitch" class="debug-val">—</span>
+              <span class="debug-key">Yaw</span>
+              <span id="d-yaw" class="debug-val">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: COMPLETED -->
+    <div id="view-completed" class="view">
+      <div class="achievement-wrap">
+        <div class="achievement-badge">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="1" opacity="0.15" />
+            <circle cx="60" cy="60" r="44" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3" />
+            <circle cx="60" cy="60" r="34" fill="currentColor" opacity="0.08" />
+            <path d="M42 60l12 12 24-24" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+          </svg>
+        </div>
+
+        <h1 class="achievement-title">목표 달성</h1>
+        <p class="achievement-sub">오늘도 집중을 완성했습니다</p>
+
+        <div class="achievement-stats">
+          <div class="ach-stat">
+            <div class="ach-val" id="sum-session">—</div>
+            <div class="ach-lbl">총 세션</div>
+          </div>
+          <div class="ach-divider"></div>
+          <div class="ach-stat">
+            <div class="ach-val ach-green" id="sum-focused">—</div>
+            <div class="ach-lbl">실제 집중</div>
+          </div>
+          <div class="ach-divider"></div>
+          <div class="ach-stat">
+            <div class="ach-val ach-gold" id="sum-rate">—</div>
+            <div class="ach-lbl">집중률</div>
+          </div>
+        </div>
+
+        <div class="unlock-banner">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="3" y="7" width="10" height="8" rx="2" fill="currentColor" opacity="0.5" />
+            <path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none" />
+          </svg>앱 잠금 해제됨
+        </div>
+
+        <div class="achievement-btns">
+          <button class="btn-outline" onclick="showView('report')">리포트 보기</button>
+          <button class="btn-primary-dark" onclick="showView('setup')">새 세션 시작</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: REPORT -->
+    <div id="view-report" class="view">
+      <div class="report-page">
+        <div class="report-topbar">
+          <h1 class="report-title">집중 리포트</h1>
+          <button class="btn-back" onclick="showView('setup')">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>돌아가기
+          </button>
+        </div>
+
+        <div id="report-empty" class="empty-state hidden">
+          <div class="empty-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="1" opacity="0.2" />
+              <path d="M16 24h16M24 16v16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.4" />
+            </svg>
+          </div>
+          <p class="empty-msg">첫 집중 세션을 시작해보세요</p>
+        </div>
+
+        <div id="report-content">
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-val" id="stat-avg">—</div>
+              <div class="kpi-lbl">평균 집중</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-val" id="stat-best">—</div>
+              <div class="kpi-lbl">최고 기록</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-val" id="stat-rate">—</div>
+              <div class="kpi-lbl">평균 집중률</div>
+            </div>
+          </div>
+
+          <div class="chart-panel">
+            <div class="chart-header">
+              <span class="chart-title">최근 7회 세션</span>
+            </div>
+            <canvas id="report-chart" height="220"></canvas>
+          </div>
+
+          <div class="history-panel">
+            <div class="history-header">세션 기록</div>
+            <div id="history-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+  </body>
+</html>
