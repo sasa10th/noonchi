@@ -100,15 +100,17 @@ FACE_OVAL_IDX = [
 
 
 def draw_overlay(frame, landmarks, is_focused, h, w):
-    green = (34, 197, 94)
-    red = (239, 68, 68)
+    green = (76, 175, 80)  # 밝은 초록색
+    red = (244, 67, 54)    # 밝은 빨간색
     color = green if is_focused else red
     bgr = (color[2], color[1], color[0])
 
+    # 랜드마크 점들 (더 작고 섬세하게)
     for lm in landmarks:
         cx, cy = int(lm.x * w), int(lm.y * h)
         cv2.circle(frame, (cx, cy), 1, bgr, -1)
 
+    # 얼굴 윤곽선
     for i in range(len(FACE_OVAL_IDX)):
         p1i = FACE_OVAL_IDX[i]
         p2i = FACE_OVAL_IDX[(i + 1) % len(FACE_OVAL_IDX)]
@@ -116,8 +118,30 @@ def draw_overlay(frame, landmarks, is_focused, h, w):
         p2 = (int(landmarks[p2i].x * w), int(landmarks[p2i].y * h))
         cv2.line(frame, p1, p2, bgr, 1)
 
-    # 테두리
-    cv2.rectangle(frame, (0, 0), (w - 1, h - 1), bgr, 5)
+    # 개선된 테두리: 둥근 모서리 효과 포함
+    margin = 12
+    radius = 20
+    thickness = 3
+    
+    # 상단 왼쪽 모서리
+    cv2.line(frame, (margin + radius, margin), (w - margin - radius, margin), bgr, thickness)
+    cv2.ellipse(frame, (margin + radius, margin + radius), (radius, radius), 180, 0, 90, bgr, thickness)
+    
+    # 상단 오른쪽 모서리
+    cv2.ellipse(frame, (w - margin - radius, margin + radius), (radius, radius), 270, 0, 90, bgr, thickness)
+    
+    # 하단 오른쪽 모서리
+    cv2.line(frame, (w - margin, margin + radius), (w - margin, h - margin - radius), bgr, thickness)
+    cv2.ellipse(frame, (w - margin - radius, h - margin - radius), (radius, radius), 0, 0, 90, bgr, thickness)
+    
+    # 하단 왼쪽 모서리
+    cv2.line(frame, (w - margin - radius, h - margin), (margin + radius, h - margin), bgr, thickness)
+    cv2.ellipse(frame, (margin + radius, h - margin - radius), (radius, radius), 90, 0, 90, bgr, thickness)
+    
+    # 왼쪽과 오른쪽 수직선
+    cv2.line(frame, (margin, margin + radius), (margin, h - margin - radius), bgr, thickness)
+    cv2.line(frame, (w - margin, margin + radius), (w - margin, h - margin - radius), bgr, thickness)
+    
     return frame
 
 
@@ -414,4 +438,3 @@ if __name__ == "__main__":
     socketio.run(
         app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True
     )
-    app.run(debug=True)

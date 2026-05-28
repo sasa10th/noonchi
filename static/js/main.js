@@ -3,6 +3,7 @@ let goalMinutes   = 30;
 let isPaused      = false;
 let reportChart   = null;
 let sessions      = [];
+let sidebarVisible = true;  // Sidebar 상태 추적
 
 /* SocketIO */
 const socket = io();
@@ -114,6 +115,22 @@ async function resetSession() {
   isPaused = false;
   updatePauseBtn(false);
   showView('setup');
+}
+
+/* Sidebar 토글 */
+function toggleSidebar() {
+  const sidebar = document.querySelector('.stats-sidebar');
+  const toggleBtn = document.getElementById('btn-toggle-sidebar');
+  
+  sidebarVisible = !sidebarVisible;
+  
+  if (sidebarVisible) {
+    sidebar.classList.remove('hidden');
+    if (toggleBtn) toggleBtn.textContent = '█■';
+  } else {
+    sidebar.classList.add('hidden');
+    if (toggleBtn) toggleBtn.textContent = '■█';
+  }
 }
 
 /* Status / Badge */
