@@ -1,5 +1,4 @@
 let currentPhase = 'setup';
-let selectedSens  = '보통';
 let goalMinutes   = 30;
 let isPaused      = false;
 let reportChart   = null;
@@ -57,14 +56,6 @@ goalSlider.addEventListener('input', () => {
   goalDisplay.textContent = goalMinutes;
 });
 
-document.querySelectorAll('.sens-pill').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.sens-pill').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedSens = btn.dataset.val;
-  });
-});
-
 document.getElementById('btn-start').addEventListener('click', startSession);
 document.getElementById('btn-start-2').addEventListener('click', startSession);
 
@@ -73,7 +64,7 @@ async function startSession() {
     const res = await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal_minutes: goalMinutes, sensitivity: selectedSens }),
+      body: JSON.stringify({ goal_minutes: goalMinutes }),
     });
     if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
     isPaused = false;

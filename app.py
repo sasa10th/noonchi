@@ -12,7 +12,7 @@ from flask_socketio import SocketIO, emit
 
 # utils
 from utils.ear_calculator import compute_ear
-from utils.focus_classifier import FocusClassifier, SENSITIVITY_PRESETS
+from utils.focus_classifier import FocusClassifier
 from utils.luminance import LuminanceDetector
 
 app = Flask(__name__)
@@ -23,7 +23,6 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 state = {
     "phase": "setup",  # setup | running | paused | completed
     "goal_seconds": 1800,
-    "sensitivity": "보통",
     "focused_time": 0.0,
     "session_time": 0.0,
     "session_start": None,
@@ -215,12 +214,22 @@ def camera_loop():
                     state["yaw"] = round(yaw_val, 1)
 
                 if not hold:
-                    is_focused, reason = classifier.classify(
-                        ear_val, pitch_val, yaw_val
+                    # 모델 예측 (sleepy/distracted/normal)
+                    focus_state, reason, confidence = classifier.classify(
+                        pitch_val, yaw_val, 0.0, lm
                     )
+                    # 상태 변환: model output → UI state
+                    state_mapping = {
+                        "sleepy": "distracted",      # 졸음 → 산만함으로 표시
+                        "distracted": "distracted",
+                        "normal": "focused",
+                    }
+                    ui_state = state_mapping.get(focus_state, "distracted")
+                    is_focused = (ui_state == "focused")
+                    
                     with state_lock:
                         state["focus_reason"] = reason
-                        state["focus_state"] = "focused" if is_focused else "distracted"
+                        state["focus_state"] = ui_state
                 else:
                     is_focused = True
                     with state_lock:
@@ -321,11 +330,9 @@ def video_feed():
 def api_start():
     global camera_thread, camera_running
     data = request.json
-    preset = SENSITIVITY_PRESETS[data.get("sensitivity", "보통")]
 
     with state_lock:
         state["goal_seconds"] = int(data.get("goal_minutes", 30)) * 60
-        state["sensitivity"] = data.get("sensitivity", "보통")
         state["focused_time"] = 0.0
         state["session_time"] = 0.0
         state["session_start"] = time.time()
@@ -335,15 +342,6 @@ def api_start():
         state["focus_reason"] = ""
         state["lum_toast_until"] = 0.0
         state["phase"] = "running"
-
-    classifier.update_params(
-        preset["ear_threshold"],
-        preset["pitch_down_max"],
-        preset["pitch_up_max"],
-        preset["yaw_max"],
-        15,
-    )
-    lum_detector.__class__.__init__(lum_detector)
 
     if not camera_running:
         camera_running = True
