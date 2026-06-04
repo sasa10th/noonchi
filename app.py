@@ -1,14 +1,25 @@
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='google.protobuf')
+
 import cv2
 import numpy as np
 import mediapipe as mp
 import time
 import math
+import re
 import threading
 import base64
 import json
 from collections import deque
 from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
+
+try:
+    import speech_recognition as sr
+    VOICE_AVAILABLE = True
+except ImportError:
+    VOICE_AVAILABLE = False
+    print("[Voice] SpeechRecognition 미설치 — pip install SpeechRecognition PyAudio")
 
 # utils
 from utils.ear_calculator import compute_ear
@@ -58,6 +69,88 @@ camera_thread = None
 camera_running = False
 _emit_counter = 0  # 브로드캐스트 속도 제한용 (~15fps)
 
+# 오버레이 표시 여부
+show_overlay = True
+
+# 음성 인식
+voice_running = False
+voice_mode    = 'active'   # 'active' | 'wake'  (thread 내부 모드)
+voice_thread_obj = None
+
+# 음성 켜기/끄기 키워드 (active→wake, wake→active)
+VOICE_SLEEP_WORDS = [
+    # 기본형 및 명사형 종료
+    '음성 꺼', '마이크 꺼', '음성 종료', '음성 비활성화', '마이크 비활성화',
+    # 조사 포함 및 구어체
+    '음성 꺼줘', '마이크 꺼줘', '음성 기능 꺼', '마이크 차단', '마이크 잠금',
+    # 유사 발음 및 오인식 방지
+    '음성꺼', '마이크꺼', '음성종료', '마크 꺼'
+]
+
+VOICE_WAKE_WORDS = [
+    # 기본형 및 명사형 활성화
+    '음성 켜', '마이크 켜', '음성 시작', '음성 활성화', '마이크 활성화',
+    # 조사 포함 및 구어체
+    '음성 켜줘', '마이크 켜줘', '음성 기능 켜', '마이크 해제', '음성 인식 시작',
+    # 유사 발음 및 오인식 방지
+    '음성켜', '마이크켜', '음성시작', '마크 켜'
+]
+
+VOICE_COMMANDS = {
+    # -----------------------------------------------------------------
+    # START (시작 / 집중)
+    # -----------------------------------------------------------------
+    '시작': 'start', '시작해': 'start', '시작해줘': 'start', '고': 'start',
+    '집중 시작': 'start', '집중해': 'start', '집중': 'start', '집중 모드': 'start',
+    '공부 시작': 'start', '타이머 시작': 'start', '시작하자': 'start',
+    
+    # -----------------------------------------------------------------
+    # PAUSE (일시정지 / 멈춤)
+    # -----------------------------------------------------------------
+    '일시정지': 'pause', '일시 정지': 'pause', '일시정지해줘': 'pause',
+    '멈춰': 'pause', '정지': 'pause', '멈춤': 'pause', '잠깐': 'pause', 
+    '잠시만': 'pause', '잠깐만': 'pause', '기다려': 'pause', '타임': 'pause',
+    '쉬기': 'pause', '휴식': 'pause',
+    
+    # -----------------------------------------------------------------
+    # RESUME (재개 / 다시 시작)
+    # -----------------------------------------------------------------
+    '재개': 'resume', '다시 재개': 'resume', '계속': 'resume', '계속해': 'resume', 
+    '계속하자': 'resume', '다시': 'resume', '다시 시작': 'resume', '다시시작': 'resume', 
+    '이어서': 'resume', '이어서 시작': 'resume', '플레이': 'resume',
+    
+    # -----------------------------------------------------------------
+    # RESET (초기화 / 종료)
+    # -----------------------------------------------------------------
+    '초기화': 'reset', '리셋': 'reset', '리셋해줘': 'reset', '처음부터': 'reset',
+    '종료': 'reset', '종료해': 'reset', '끝내': 'reset', '끝': 'reset', 
+    '그만': 'reset', '그만해': 'reset', '취소': 'reset', '클리어': 'reset',
+    
+    # -----------------------------------------------------------------
+    # OVERLAY ON (마스크 / 필터 켜기)
+    # -----------------------------------------------------------------
+    '마스크 켜': 'overlay_on', '마스크 켜줘': 'overlay_on', '마스크 표시': 'overlay_on', 
+    '필터 켜': 'overlay_on', '필터 켜줘': 'overlay_on', '필터 표시': 'overlay_on',
+    '화면 마스크': 'overlay_on', '화면 필터': 'overlay_on', '마스크 보이기': 'overlay_on',
+    # 띄어쓰기 오류 방지
+    '마스크켜': 'overlay_on', '필터켜': 'overlay_on',
+    
+    # -----------------------------------------------------------------
+    # OVERLAY OFF (마스크 / 필터 끄기)
+    # -----------------------------------------------------------------
+    '마스크 꺼': 'overlay_off', '마스크 꺼줘': 'overlay_off', '마스크 숨겨': 'overlay_off', 
+    '필터 꺼': 'overlay_off', '필터 꺼줘': 'overlay_off', '필터 숨겨': 'overlay_off',
+    '마스크 해제': 'overlay_off', '필터 해제': 'overlay_off', '마스크 안보이게': 'overlay_off',
+    # 띄어쓰기 오류 방지
+    '마스크꺼': 'overlay_off', '필터꺼': 'overlay_off',
+    
+    # -----------------------------------------------------------------
+    # OVERLAY TOGGLE (마스크 전환)
+    # -----------------------------------------------------------------
+    '마스크': 'overlay_toggle', '필터': 'overlay_toggle', '마스크 전환': 'overlay_toggle',
+    '필터 전환': 'overlay_toggle', '반전': 'overlay_toggle'
+}
+
 # 얼굴 랜드마크 오버레이
 FACE_OVAL_IDX = [
     10,
@@ -97,6 +190,152 @@ FACE_OVAL_IDX = [
     67,
     109,
 ]
+
+
+def parse_time_from_text(text):
+    """한국어 음성에서 목표 시간(분)을 파싱. 없으면 None 반환."""
+    m = re.search(r'(\d+)\s*시간\s*(\d+)\s*분', text)
+    if m:
+        return max(5, min(120, int(m.group(1)) * 60 + int(m.group(2))))
+    m = re.search(r'(\d+)\s*시간', text)
+    if m:
+        return max(5, min(120, int(m.group(1)) * 60))
+    m = re.search(r'(\d+)\s*분', text)
+    if m:
+        return max(5, min(120, int(m.group(1))))
+    return None
+
+
+def apply_voice_command(command):
+    global camera_running, camera_thread
+    if command == 'start':
+        with state_lock:
+            if state['phase'] in ('setup', 'completed'):
+                state['focused_time'] = 0.0
+                state['session_time'] = 0.0
+                state['session_start'] = time.time()
+                state['last_tick'] = None
+                state['distract_start'] = None
+                state['focus_state'] = 'no_face'
+                state['focus_reason'] = ''
+                state['lum_toast_until'] = 0.0
+                state['phase'] = 'running'
+        if not camera_running:
+            camera_running = True
+            camera_thread = threading.Thread(target=camera_loop, daemon=True)
+            camera_thread.start()
+    elif command == 'pause':
+        with state_lock:
+            if state['phase'] == 'running':
+                state['phase'] = 'paused'
+                state['last_tick'] = None
+    elif command == 'resume':
+        with state_lock:
+            if state['phase'] == 'paused':
+                state['phase'] = 'running'
+                state['last_tick'] = None
+    elif command == 'reset':
+        with state_lock:
+            state['phase'] = 'setup'
+            state['focused_time'] = 0.0
+            state['session_time'] = 0.0
+            state['last_tick'] = None
+            state['focus_state'] = 'no_face'
+            state['focus_reason'] = ''
+            state['distract_start'] = None
+    elif command in ('overlay_on', 'overlay_off', 'overlay_toggle'):
+        global show_overlay
+        if command == 'overlay_on':
+            show_overlay = True
+        elif command == 'overlay_off':
+            show_overlay = False
+        else:
+            show_overlay = not show_overlay
+        socketio.emit('overlay_status', {'show': show_overlay})
+
+
+def _emit_voice(active, mode, listening, **extra):
+    socketio.emit('voice_status', {'active': active, 'mode': mode, 'listening': listening, **extra})
+
+
+def voice_loop():
+    global voice_running, voice_mode
+    if not VOICE_AVAILABLE:
+        return
+
+    r = sr.Recognizer()
+    r.dynamic_energy_threshold = True
+
+    try:
+        with sr.Microphone() as source:
+            _emit_voice(True, voice_mode, False)
+            r.adjust_for_ambient_noise(source, duration=1)
+
+            while voice_running:
+                is_wake = (voice_mode == 'wake')
+                try:
+                    if not is_wake:
+                        _emit_voice(True, 'active', True)
+
+                    audio = r.listen(source, timeout=5,
+                                     phrase_time_limit=2 if is_wake else 5)
+
+                    if not is_wake:
+                        _emit_voice(True, 'active', False)
+
+                    text = r.recognize_google(audio, language='ko-KR').strip()
+                    print(f'[Voice] [{voice_mode}] 인식: {text}')
+
+                    # ── wake 모드: 활성화 키워드만 감지 ──
+                    if is_wake:
+                        if any(w in text for w in VOICE_WAKE_WORDS):
+                            voice_mode = 'active'
+                            _emit_voice(True, 'active', False)
+                        continue
+
+                    # ── active 모드: 전체 명령 처리 ──
+
+                    # 1) 음성 끄기
+                    if any(w in text for w in VOICE_SLEEP_WORDS):
+                        voice_mode = 'wake'
+                        _emit_voice(True, 'wake', False)
+                        socketio.emit('voice_command', {'command': 'voice_off', 'text': text})
+                        continue
+
+                    # 2) 시간 설정 (N분 / N시간 패턴 우선)
+                    minutes = parse_time_from_text(text)
+                    if minutes:
+                        with state_lock:
+                            state['goal_seconds'] = minutes * 60
+                        socketio.emit('voice_command',
+                                      {'command': 'set_time', 'text': text, 'minutes': minutes})
+                        # 시간 설정과 함께 시작 명령도 있으면 계속 진행
+
+                    # 3) 액션 명령
+                    command = None
+                    for keyword, cmd in VOICE_COMMANDS.items():
+                        if keyword in text:
+                            command = cmd
+                            break
+                    if command:
+                        socketio.emit('voice_command', {'command': command, 'text': text})
+                        apply_voice_command(command)
+
+                except sr.WaitTimeoutError:
+                    if not is_wake:
+                        _emit_voice(True, voice_mode, False)
+                except sr.UnknownValueError:
+                    if not is_wake:
+                        _emit_voice(True, voice_mode, False)
+                except Exception as e:
+                    print(f'[Voice] 오류: {e}')
+
+    except Exception as e:
+        print(f'[Voice] 마이크 오류: {e}')
+        _emit_voice(False, 'active', False, error=str(e))
+    finally:
+        voice_running = False
+        _emit_voice(False, 'active', False)
 
 
 def draw_overlay(frame, landmarks, is_focused, h, w):
@@ -260,7 +499,7 @@ def camera_loop():
                     with state_lock:
                         state["focus_state"] = "hold"
 
-                frame_rgb = draw_overlay(rgb.copy(), lm, is_focused, h, w)
+                frame_rgb = draw_overlay(rgb.copy(), lm, is_focused, h, w) if show_overlay else rgb
             else:
                 with state_lock:
                     state["focus_state"] = "no_face"
@@ -425,17 +664,46 @@ def api_state():
         return jsonify(dict(state))
 
 
+@app.route("/api/overlay/toggle", methods=["POST"])
+def api_overlay_toggle():
+    global show_overlay
+    show_overlay = not show_overlay
+    socketio.emit('overlay_status', {'show': show_overlay})
+    return jsonify({"ok": True, "show": show_overlay})
+
+
+@app.route("/api/voice/toggle", methods=["POST"])
+def api_voice_toggle():
+    global voice_running, voice_thread_obj, voice_mode
+    if not VOICE_AVAILABLE:
+        return jsonify({"ok": False, "error": "SpeechRecognition 미설치"})
+    if voice_running:
+        voice_running = False
+        voice_mode = 'active'
+        return jsonify({"ok": True, "active": False})
+    voice_mode = 'active'
+    voice_running = True
+    voice_thread_obj = threading.Thread(target=voice_loop, daemon=True)
+    voice_thread_obj.start()
+    return jsonify({"ok": True, "active": True})
+
+
 if __name__ == "__main__":
     print("NoonChi 서버 시작: http://localhost:5000")
 
     @socketio.on("connect")
     def on_connect():
-        global camera_thread, camera_running
+        global camera_thread, camera_running, voice_thread_obj, voice_running, voice_mode
         if not camera_running:
             camera_running = True
             camera_thread = threading.Thread(target=camera_loop, daemon=True)
             camera_thread.start()
+        if VOICE_AVAILABLE and not voice_running:
+            voice_mode = 'active'
+            voice_running = True
+            voice_thread_obj = threading.Thread(target=voice_loop, daemon=True)
+            voice_thread_obj.start()
 
     socketio.run(
-        app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True
+        app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True
     )

@@ -2,6 +2,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Deque, Optional, Dict
 import numpy as np
+import pandas as pd
 import os
 
 @dataclass
@@ -215,8 +216,11 @@ class FocusClassifier:
             return "normal", "수집 중...", 0.0
         
         try:
-            # 특성 벡터 구성 (feature_names 순서대로)
-            X = np.array([[features.get(name, 0.0) for name in self._feature_names]])
+            # 특성 벡터 구성 (DataFrame으로 전달해야 feature name 경고 없음)
+            X = pd.DataFrame(
+                [[features.get(name, 0.0) for name in self._feature_names]],
+                columns=self._feature_names,
+            )
             
             # 예측
             prediction = self._model.predict(X)[0]

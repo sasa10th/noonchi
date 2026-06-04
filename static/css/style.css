@@ -400,7 +400,8 @@ body {
 .config-start {
   padding-top: 2rem;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .btn-config-start {
@@ -1143,6 +1144,107 @@ body {
   font-weight: 300;
 }
 
+/* Voice button — setup view */
+.config-start {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-voice-setup {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 44px;
+  padding: 0 1.2rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 100px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-voice-setup:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--white);
+}
+
+.btn-voice-setup.voice-active {
+  background: rgba(48, 209, 88, 0.1);
+  border-color: rgba(48, 209, 88, 0.35);
+  color: var(--green);
+}
+
+.btn-voice-setup.voice-listening {
+  background: rgba(48, 209, 88, 0.12);
+  border-color: rgba(48, 209, 88, 0.4);
+  color: var(--green);
+  animation: pulse-mic 1.2s ease infinite;
+}
+
+.btn-voice-setup.voice-wake {
+  background: rgba(255, 214, 10, 0.08);
+  border-color: rgba(255, 214, 10, 0.25);
+  color: var(--gold);
+}
+
+/* Voice button — focus bar */
+#btn-voice-focus.voice-active {
+  color: var(--green);
+  border-color: rgba(48, 209, 88, 0.3);
+  background: rgba(48, 209, 88, 0.08);
+}
+
+#btn-voice-focus.voice-listening {
+  color: var(--green);
+  border-color: rgba(48, 209, 88, 0.3);
+  background: rgba(48, 209, 88, 0.08);
+  animation: pulse-mic 1.2s ease infinite;
+}
+
+#btn-voice-focus.voice-wake {
+  color: var(--gold);
+  border-color: rgba(255, 214, 10, 0.25);
+  background: rgba(255, 214, 10, 0.06);
+}
+
+@keyframes pulse-mic {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Voice command toast */
+.voice-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  background: rgba(17, 17, 19, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--white);
+  z-index: 300;
+  white-space: nowrap;
+  animation: fadeUp 0.25s ease;
+}
+
+.voice-toast svg {
+  color: var(--green);
+  flex-shrink: 0;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
@@ -1301,6 +1403,10 @@ body {
 
 #btn-toggle-sidebar.sidebar-hidden svg {
   transform: scaleX(-1);
+}
+
+#btn-overlay.overlay-off {
+  color: rgba(255, 255, 255, 0.3);
 }
 
 /* 카메라 전체 너비 클래스 */

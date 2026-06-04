@@ -4,6 +4,8 @@ let isPaused      = false;
 let reportChart   = null;
 let sessions      = [];
 let sidebarVisible = true;  // Sidebar 상태 추적
+let voiceActive    = false;
+let voiceToastTimer = null;
 
 /* SocketIO */
 const socket = io();
@@ -242,6 +244,136 @@ function showCompleted(s) {
   document.getElementById('sum-focused').textContent = fmtTime(s.focused_time);
   document.getElementById('sum-rate').textContent    = rate + '%';
   showView('completed');
+}
+
+/* Overlay toggle */
+async function toggleOverlay() {
+  const res  = await fetch('/api/overlay/toggle', { method: 'POST' });
+  const data = await res.json();
+  updateOverlayBtn(data.show);
+}
+
+function updateOverlayBtn(show) {
+  const btn  = document.getElementById('btn-overlay');
+  const icon = document.getElementById('overlay-icon');
+  if (!btn || !icon) return;
+  if (show) {
+    btn.classList.remove('overlay-off');
+    icon.innerHTML = `
+      <ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/>
+      <circle cx="7" cy="7" r="2" fill="currentColor"/>`;
+  } else {
+    btn.classList.add('overlay-off');
+    icon.innerHTML = `
+      <ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/>
+      <line x1="2" y1="2" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>`;
+  }
+}
+
+socket.on('overlay_status', (data) => {
+  updateOverlayBtn(data.show);
+  const label = data.show ? '마스크 표시됨' : '마스크 숨겨짐';
+  showVoiceToast(label);
+});
+
+/* Voice recognition */
+async function toggleVoice() {
+  try {
+    const res  = await fetch('/api/voice/toggle', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) {
+      alert('음성 인식을 사용할 수 없습니다.\npip install SpeechRecognition PyAudio 후 서버를 재시작하세요.');
+      return;
+    }
+    voiceActive = data.active;
+    updateVoiceBtns(voiceActive, 'active', false);
+  } catch (err) {
+    console.error('[Voice] 토글 실패:', err);
+  }
+}
+
+function updateVoiceBtns(active, mode, listening) {
+  ['btn-voice-focus', 'btn-voice-setup'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.remove('voice-active', 'voice-listening', 'voice-wake');
+    if (!active)        { /* 기본 스타일 */ }
+    else if (listening) btn.classList.add('voice-listening');
+    else if (mode === 'wake') btn.classList.add('voice-wake');
+    else                btn.classList.add('voice-active');
+  });
+
+  const setupLabel = document.getElementById('voice-setup-label');
+  if (setupLabel) {
+    if (!active)             setupLabel.textContent = '음성 명령';
+    else if (listening)      setupLabel.textContent = '듣는 중…';
+    else if (mode === 'wake') setupLabel.textContent = '"음성 켜" 대기';
+    else                     setupLabel.textContent = '음성 켜짐';
+  }
+}
+
+socket.on('voice_status', (data) => {
+  voiceActive = data.active;
+  updateVoiceBtns(data.active, data.mode || 'active', data.listening);
+  if (data.error) console.warn('[Voice] 오류:', data.error);
+});
+
+const VOICE_LABELS = {
+  start: '집중 시작', pause: '일시정지', resume: '재개', reset: '초기화',
+  voice_off: '음성 대기 모드', set_time: '목표 시간 설정',
+  overlay_on: '마스크 표시', overlay_off: '마스크 숨김', overlay_toggle: '마스크 전환',
+};
+
+socket.on('voice_command', (data) => {
+  // 시간 설정
+  if (data.command === 'set_time') {
+    goalMinutes = data.minutes;
+    goalSlider.value  = goalMinutes;
+    goalDisplay.textContent = goalMinutes;
+    document.getElementById('ring-goal').textContent = `/ ${goalMinutes}분`;
+    showVoiceToast(`목표 ${goalMinutes}분으로 설정됨`);
+    return;
+  }
+
+  // 음성 끄기 (wake 모드 전환)
+  if (data.command === 'voice_off') {
+    updateVoiceBtns(true, 'wake', false);
+    showVoiceToast('"음성 켜" 라고 말하면 재활성화됩니다');
+    return;
+  }
+
+  showVoiceToast(`"${data.text}" → ${VOICE_LABELS[data.command] || data.command}`);
+
+  if (data.command === 'pause') {
+    isPaused = true;
+    currentPhase = 'paused';
+    updatePauseBtn(true);
+  } else if (data.command === 'resume') {
+    isPaused = false;
+    currentPhase = 'running';
+    updatePauseBtn(false);
+  } else if (data.command === 'reset') {
+    currentPhase = 'setup';
+    isPaused = false;
+    updatePauseBtn(false);
+    showView('setup');
+  } else if (data.command === 'start') {
+    isPaused = false;
+    currentPhase = 'running';
+    updatePauseBtn(false);
+    document.getElementById('ring-goal').textContent = `/ ${goalMinutes}분`;
+    showView('focus');
+  }
+});
+
+function showVoiceToast(text) {
+  const toast  = document.getElementById('voice-toast');
+  const textEl = document.getElementById('voice-toast-text');
+  if (!toast || !textEl) return;
+  textEl.textContent = text;
+  toast.classList.remove('hidden');
+  if (voiceToastTimer) clearTimeout(voiceToastTimer);
+  voiceToastTimer = setTimeout(() => toast.classList.add('hidden'), 2500);
 }
 
 /* Report */

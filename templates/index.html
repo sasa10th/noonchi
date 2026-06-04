@@ -24,7 +24,7 @@
           </svg>NoonChi
         </div>
         <div class="nav-links">
-          <button class="nav-link active" data-view="setup" onclick="showView('setup')">집중</button>
+          <button class="nav-link active" data-view="setup" onclick="showView('setup')">홈</button>
           <button class="nav-link" data-view="report" onclick="showView('report')">리포트</button>
         </div>
       </div>
@@ -34,17 +34,17 @@
     <div id="view-setup" class="view active">
       <!-- Hero Section -->
       <section class="hero-section">
-        <div class="hero-eyebrow">AI 기반 집중도 측정</div>
+        <div class="hero-eyebrow">인공지능 프로젝트</div>
         <h1 class="hero-title">
-          집중이<br />
-          <em>시작되는 곳</em>
+          눈치코치<br />
+          <em>NoonChi</em>
         </h1>
         <p class="hero-sub">
-          카메라가 시선과 자세를 실시간으로 분석합니다.<br />집중한 시간을 기록하고, 성장을 확인하세요.
+          사용자의 상태를 실시간으로 분석하고<br>집중을 유지하도록 돕는 지능형 학습 보조 시스템
         </p>
 
         <div class="hero-cta">
-          <button class="btn-hero" id="btn-start">집중 설정하기</button>
+          <button class="btn-hero" id="btn-start">타이머 설정하기</button>
         </div>
 
         <!-- Scroll indicator -->
@@ -77,6 +77,14 @@
           <div class="config-divider"></div>
 
           <div class="config-block config-start">
+            <button class="btn-voice-setup" id="btn-voice-setup" onclick="toggleVoice()" title="음성 명령 켜기/끄기">
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+                <path d="M2 7.5a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                <line x1="7" y1="12.5" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+              <span id="voice-setup-label">음성 명령</span>
+            </button>
             <button class="btn-config-start" id="btn-start-2">
               <span>집중 시작</span>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -106,6 +114,19 @@
             </svg>
             <span id="pause-label">일시정지</span>
           </button>
+          <button class="focus-btn" id="btn-overlay" onclick="toggleOverlay()" title="마스크 표시/숨김">
+            <svg id="overlay-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/>
+              <circle cx="7" cy="7" r="2" fill="currentColor"/>
+            </svg>
+          </button>
+          <button class="focus-btn" id="btn-voice-focus" onclick="toggleVoice()" title="음성 명령">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+              <path d="M2 7.5a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <line x1="7" y1="12.5" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </button>
           <button class="focus-btn" id="btn-toggle-sidebar" onclick="toggleSidebar()" title="정보판 표시/숨김">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"/>
@@ -116,13 +137,23 @@
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M2 7a5 5 0 1 0 1-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
               <path d="M2 3v4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>초기화
+            </svg>종료
           </button>
         </div>
       </div>
 
       <!-- Luminance toast -->
       <div id="lum-toast" class="lum-toast hidden">⚠ 조도 변화 감지 — 판정 보류 중</div>
+
+      <!-- Voice command toast -->
+      <div id="voice-toast" class="voice-toast hidden">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+          <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+          <path d="M2 7.5a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          <line x1="7" y1="12.5" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        <span id="voice-toast-text"></span>
+      </div>
 
       <!-- Main monitor layout -->
       <div class="monitor-grid">
