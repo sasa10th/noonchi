@@ -100,10 +100,11 @@ FACE_OVAL_IDX = [
 
 
 def draw_overlay(frame, landmarks, is_focused, h, w):
-    green = (76, 175, 80)  # 밝은 초록색
-    red = (244, 67, 54)    # 밝은 빨간색
+    # Frame is RGB — use RGB tuples directly (matches frontend --green/#30d158 and --red/#ff453a)
+    green = (48, 209, 88)
+    red = (255, 69, 58)
     color = green if is_focused else red
-    bgr = (color[2], color[1], color[0])
+    bgr = color
 
     # 랜드마크 점들 (더 작고 섬세하게)
     for lm in landmarks:

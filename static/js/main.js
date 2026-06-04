@@ -57,7 +57,9 @@ goalSlider.addEventListener('input', () => {
   goalDisplay.textContent = goalMinutes;
 });
 
-document.getElementById('btn-start').addEventListener('click', startSession);
+document.getElementById('btn-start').addEventListener('click', () => {
+  document.querySelector('.config-section').scrollIntoView({ behavior: 'smooth' });
+});
 document.getElementById('btn-start-2').addEventListener('click', startSession);
 
 async function startSession() {
@@ -119,17 +121,20 @@ async function resetSession() {
 
 /* Sidebar 토글 */
 function toggleSidebar() {
-  const sidebar = document.querySelector('.stats-sidebar');
+  const sidebar   = document.querySelector('.stats-sidebar');
+  const grid      = document.querySelector('.monitor-grid');
   const toggleBtn = document.getElementById('btn-toggle-sidebar');
-  
+
   sidebarVisible = !sidebarVisible;
-  
+
   if (sidebarVisible) {
     sidebar.classList.remove('hidden');
-    if (toggleBtn) toggleBtn.textContent = '█■';
+    grid.classList.remove('fullscreen-camera');
+    toggleBtn.classList.remove('sidebar-hidden');
   } else {
     sidebar.classList.add('hidden');
-    if (toggleBtn) toggleBtn.textContent = '■█';
+    grid.classList.add('fullscreen-camera');
+    toggleBtn.classList.add('sidebar-hidden');
   }
 }
 
