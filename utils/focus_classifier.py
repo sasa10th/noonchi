@@ -13,7 +13,7 @@ class FocusClassifier:
     입력: 3-5초 시간 윈도우의 집계 통계 특성
     출력: sleepy / distracted / normal
     """
-    window_size: int = 90  # 30fps에서 3초 ≈ 90프레임
+    window_size: int = 45  # 30fps에서 3초 ≈ 90프레임
     
     _model = None
     _feature_names = None
