@@ -52,6 +52,7 @@ state_lock = threading.Lock()
 
 classifier = FocusClassifier()
 lum_detector = LuminanceDetector()
+screen_pipeline = None
 
 # MediaPipe FaceMesh
 mp_fm = mp.solutions.face_mesh
@@ -385,6 +386,36 @@ def draw_overlay(frame, landmarks, is_focused, h, w):
     return frame
 
 
+def get_screen_pipeline():
+    global screen_pipeline
+    if screen_pipeline is not None:
+        return screen_pipeline
+
+    try:
+        from utils.screen_pipeline import ScreenAnalysisPipeline
+
+        screen_pipeline = ScreenAnalysisPipeline()
+        return screen_pipeline
+    except Exception as e:
+        print(f"[Screen] pipeline unavailable: {e}")
+        screen_pipeline = False
+        return None
+
+
+def apply_screen_judgment(camera_state, camera_reason, now):
+    if camera_state != "focused":
+        return camera_state, camera_reason
+
+    pipeline = get_screen_pipeline()
+    if not pipeline:
+        return camera_state, camera_reason
+
+    result = pipeline.maybe_analyze(now=now)
+    if result.state == "distracted":
+        return "distracted", result.reason
+    return camera_state, camera_reason
+
+
 # 헤드 포즈 (랜드마크 기반)
 def extract_head_pose(lm, w, h):
     def pt(i):
@@ -489,6 +520,11 @@ def camera_loop():
                         "normal": "focused",
                     }
                     ui_state = state_mapping.get(focus_state, "distracted")
+                    ui_state, reason = apply_screen_judgment(
+                        ui_state,
+                        reason,
+                        time.time(),
+                    )
                     is_focused = (ui_state == "focused")
                     
                     with state_lock:
