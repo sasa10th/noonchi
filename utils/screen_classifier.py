@@ -40,7 +40,7 @@ class ScreenClassifier:
             self._torch = torch
             self._image_cls = Image
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            checkpoint = torch.load(self.model_path, map_location=self.device)
+            checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=False)
             self.class_names = list(checkpoint["class_names"])
 
             model = models.resnet18(weights=None)

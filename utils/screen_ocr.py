@@ -5,6 +5,16 @@ import cv2
 
 try:
     import pytesseract
+    import os as _os
+    _candidates = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]
+    if pytesseract.pytesseract.tesseract_cmd == "tesseract":
+        for _p in _candidates:
+            if _os.path.exists(_p):
+                pytesseract.pytesseract.tesseract_cmd = _p
+                break
 except ImportError:  # pragma: no cover
     pytesseract = None
 
