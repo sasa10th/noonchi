@@ -51,11 +51,11 @@ class FocusClassifier:
             self._feature_names = model_data["features"]
             self._classes = model_data["classes"]
             self._model_loaded = True
-            print(f"✓ 모델 로드 성공: {model_path}")
+            print(f"[OK] 모델 로드 성공: {model_path}")
             print(f"  - 특성: {len(self._feature_names)}개")
             print(f"  - 클래스: {list(self._classes)}")
         except Exception as e:
-            print(f"✗ 모델 로드 실패: {e}")
+            print(f"[FAIL] 모델 로드 실패: {e}")
             self._model_loaded = True
 
     def update_frame(self, landmarks, pitch: float, yaw: float, roll: float = 0.0):
