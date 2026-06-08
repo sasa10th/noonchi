@@ -7,7 +7,7 @@ class ScreenClassifier:
     def __init__(self, model_path: str | None = None):
         base_dir = os.path.dirname(os.path.dirname(__file__))
         self.model_path = model_path or os.path.normpath(
-            os.path.join(base_dir, "..", "screen_resnet18_best.pt")
+            os.path.join(base_dir, "screen_resnet18_best.pt")
         )
         self.device = None
         self.model = None
