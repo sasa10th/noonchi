@@ -47,6 +47,8 @@ state = {
     "grace_period": 2.0,
     "lum_toast_until": 0.0,
     "sessions": [],
+    "screen_state": "unknown",   # study | distracted | unknown
+    "screen_reason": "",
 }
 state_lock = threading.Lock()
 
@@ -403,17 +405,31 @@ def get_screen_pipeline():
 
 
 def apply_screen_judgment(camera_state, camera_reason, now):
-    if camera_state != "focused":
-        return camera_state, camera_reason
-
+    """
+    Returns (final_state, final_reason, screen_state, screen_reason).
+    - 태블릿은 웹캠 상태와 무관하게 항상 분석 (UI에 별도 표시).
+    - 최종 집중 판정 규칙:
+        웹캠 distracted  → 항상 distracted (태블릿 무관)
+        웹캠 focused + 태블릿 distracted → distracted
+        웹캠 focused + 태블릿 study/unknown → focused 유지
+    """
     pipeline = get_screen_pipeline()
     if not pipeline:
-        return camera_state, camera_reason
+        return camera_state, camera_reason, "unknown", ""
 
     result = pipeline.maybe_analyze(now=now)
-    if result.state == "distracted":
-        return "distracted", result.reason
-    return camera_state, camera_reason
+    scr_state = result.state
+    scr_reason = result.reason
+
+    # 웹캠이 이미 distracted면 최종 판정은 변하지 않음
+    if camera_state != "focused":
+        return camera_state, camera_reason, scr_state, scr_reason
+
+    # 웹캠 focused + 태블릿 distracted → 최종 distracted
+    if scr_state == "distracted":
+        return "distracted", scr_reason, scr_state, scr_reason
+
+    return camera_state, camera_reason, scr_state, scr_reason
 
 
 # 헤드 포즈 (랜드마크 기반)
@@ -520,20 +536,29 @@ def camera_loop():
                         "normal": "focused",
                     }
                     ui_state = state_mapping.get(focus_state, "distracted")
-                    ui_state, reason = apply_screen_judgment(
-                        ui_state,
-                        reason,
-                        time.time(),
-                    )
+                    try:
+                        ui_state, reason, scr_state, scr_reason = apply_screen_judgment(
+                            ui_state,
+                            reason,
+                            time.time(),
+                        )
+                    except Exception as e:
+                        # 태블릿 분석 실패가 카메라 루프를 죽이지 않도록 방어
+                        print(f"[Screen] apply_screen_judgment 예외 (무시됨): {e}")
+                        scr_state, scr_reason = "unknown", f"error: {e}"
                     is_focused = (ui_state == "focused")
-                    
+
                     with state_lock:
                         state["focus_reason"] = reason
                         state["focus_state"] = ui_state
+                        state["screen_state"] = scr_state
+                        state["screen_reason"] = scr_reason
                 else:
                     is_focused = True
                     with state_lock:
                         state["focus_state"] = "hold"
+                        state["screen_state"] = "unknown"
+                        state["screen_reason"] = ""
 
                 frame_rgb = draw_overlay(rgb.copy(), lm, is_focused, h, w) if show_overlay else rgb
             else:
@@ -595,6 +620,8 @@ def camera_loop():
                     "goal_seconds": snap["goal_seconds"],
                     "lum_toast": time.time() < snap["lum_toast_until"],
                     "sessions": snap["sessions"],
+                    "screen_state": snap["screen_state"],
+                    "screen_reason": snap["screen_reason"],
                 },
             )
 

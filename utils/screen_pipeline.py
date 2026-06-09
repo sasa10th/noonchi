@@ -18,6 +18,9 @@ class ScreenAnalysisResult:
 
 
 class ScreenAnalysisPipeline:
+    # 연속 캡처 실패가 이 횟수 이상일 때만 "미연결"로 표시
+    DISCONNECT_THRESHOLD = 3
+
     def __init__(self, window_keyword: str = "iPad", check_interval: float = 1.5):
         self.window_keyword = window_keyword
         self.check_interval = check_interval
@@ -26,9 +29,10 @@ class ScreenAnalysisPipeline:
         self.ocr = OCRKeywordClassifier()
         self._last_result = ScreenAnalysisResult(
             state="unknown",
-            reason="screen pipeline not checked yet",
+            reason="",
             source="init",
         )
+        self._consecutive_failures = 0  # 연속 캡처 실패 횟수
 
     def maybe_analyze(self, now: Optional[float] = None):
         now = now or time.time()
@@ -39,23 +43,46 @@ class ScreenAnalysisPipeline:
 
     def analyze(self, now: Optional[float] = None):
         now = now or time.time()
+        try:
+            result = self._analyze_inner(now)
+            return result
+        except Exception as exc:
+            print(f"[Screen] analyze 예외 (무시됨): {exc}")
+            self._consecutive_failures += 1
+            return self._unknown_result(f"analyze error: {exc}", now)
 
-        if not self.capturer.available:
+    def _unknown_result(self, reason: str, now: float) -> ScreenAnalysisResult:
+        """실패 횟수가 임계값 미만이면 이전 결과를 유지하고, 초과하면 unknown 반환."""
+        if self._consecutive_failures < self.DISCONNECT_THRESHOLD:
+            # 화면 전환 등 일시적 실패 — 마지막 정상 결과를 유지
+            prev = self._last_result
             return ScreenAnalysisResult(
-                state="unknown",
-                reason="screen capture dependencies unavailable",
-                source="capture",
+                state=prev.state,
+                reason=prev.reason,
+                confidence=prev.confidence,
+                source=prev.source,
                 checked_at=now,
             )
+        # 3회 이상 연속 실패 → 진짜 연결 끊김으로 판단
+        return ScreenAnalysisResult(
+            state="unknown",
+            reason="iPad 창 없음",
+            source="capture",
+            checked_at=now,
+        )
+
+    def _analyze_inner(self, now: float):
+        if not self.capturer.available:
+            self._consecutive_failures += 1
+            return self._unknown_result("screen capture dependencies unavailable", now)
 
         frame, capture_reason = self.capturer.capture()
         if frame is None:
-            return ScreenAnalysisResult(
-                state="unknown",
-                reason=capture_reason,
-                source="capture",
-                checked_at=now,
-            )
+            self._consecutive_failures += 1
+            return self._unknown_result(capture_reason, now)
+
+        # 캡처 성공 → 실패 카운터 초기화
+        self._consecutive_failures = 0
 
         label, confidence, classify_reason = self.classifier.classify(frame)
         if label == "study":

@@ -47,20 +47,26 @@ class WindowScreenCapturer:
         if hwnd is None:
             return None, f"window not found: {self.window_keyword}"
 
-        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        width = right - left
-        height = bottom - top
-        if width <= 0 or height <= 0:
-            return None, "invalid window size"
-
-        hwnd_dc = win32gui.GetWindowDC(hwnd)
-        mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
-        save_dc = mfc_dc.CreateCompatibleDC()
-        bitmap = win32ui.CreateBitmap()
-        bitmap.CreateCompatibleBitmap(mfc_dc, width, height)
-        save_dc.SelectObject(bitmap)
-
+        # 화면 전환 중 HWND가 무효화되면 GetWindowRect 포함 이후 모든 Win32 호출이
+        # 예외를 던질 수 있으므로 전체를 감싼다. 실패 시 캐시도 초기화.
+        hwnd_dc = None
+        mfc_dc = None
+        save_dc = None
+        bitmap = None
         try:
+            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+            width = right - left
+            height = bottom - top
+            if width <= 0 or height <= 0:
+                return None, "invalid window size"
+
+            hwnd_dc = win32gui.GetWindowDC(hwnd)
+            mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
+            save_dc = mfc_dc.CreateCompatibleDC()
+            bitmap = win32ui.CreateBitmap()
+            bitmap.CreateCompatibleBitmap(mfc_dc, width, height)
+            save_dc.SelectObject(bitmap)
+
             result = ctypes.windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 2)
             if result != 1:
                 return None, f"PrintWindow failed: {result}"
@@ -78,8 +84,21 @@ class WindowScreenCapturer:
             )
             frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
             return frame, "captured"
+
+        except Exception as exc:
+            # 화면 전환 등으로 캡처 실패 → 캐시 초기화 후 다음 틱에서 재탐색
+            self._hwnd = None
+            return None, f"capture error (screen transition?): {exc}"
+
         finally:
-            win32gui.DeleteObject(bitmap.GetHandle())
-            save_dc.DeleteDC()
-            mfc_dc.DeleteDC()
-            win32gui.ReleaseDC(hwnd, hwnd_dc)
+            try:
+                if bitmap is not None:
+                    win32gui.DeleteObject(bitmap.GetHandle())
+                if save_dc is not None:
+                    save_dc.DeleteDC()
+                if mfc_dc is not None:
+                    mfc_dc.DeleteDC()
+                if hwnd_dc is not None:
+                    win32gui.ReleaseDC(hwnd, hwnd_dc)
+            except Exception:
+                pass  # 정리 실패는 무시

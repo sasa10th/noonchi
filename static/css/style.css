@@ -1417,3 +1417,48 @@ body {
 .monitor-grid.fullscreen-camera .stats-sidebar {
   display: none;
 }
+/* ── Tablet screen status tile ───────────────────────── */
+.stat-tile-screen {
+  padding: 12px 14px;
+}
+
+.screen-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.screen-pill {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.screen-unknown {
+  background: rgba(134,134,139,0.15);
+  color: var(--gray-400);
+}
+
+.screen-study {
+  background: rgba(48,209,88,0.15);
+  color: var(--green);
+}
+
+.screen-distracted {
+  background: rgba(255,69,58,0.15);
+  color: var(--red);
+}
+
+.screen-reason {
+  font-size: 10px;
+  color: var(--gray-400);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}

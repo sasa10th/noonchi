@@ -10,4 +10,10 @@ SpeechRecognition>=3.10.0
 PyAudio>=0.2.14
 Pillow>=10.0.0
 pywin32>=306
-pytesseract>=0.3.10
+# Windows 내장 OCR (Tesseract 대체 — 별도 바이너리 불필요)
+winrt-Windows.Media.Ocr>=2.0
+winrt-Windows.Graphics.Imaging>=2.0
+winrt-Windows.Storage.Streams>=2.0
+winrt-Windows.Globalization>=2.0
+# 의미 기반 분류 (선택 — 없으면 키워드 룰로 동작)
+sentence-transformers>=2.7.0,<4.0.0

@@ -1,0 +1,23 @@
+[OCR] sentence-transformers 모델 로딩 중…
+[OCR] sentence-transformers 로드 완료
+[ test1 - Google MVT검색+필기앱 ]
+  ResNet  : unknown (95%)
+  OCR text: '오전 8石7 6월 4일 목요일 4 口 9 氏 兮 730/0 〔-二)• 山 google.com GoogIe 0 쇼핑 \\ⅴ翁3+5 오• 父 시 모드 Vt 전체 이미지 동영상 十 시 개요 MVT(평균값 정리 )는 미적분학에서 다루는 핵심 개념 입니다. 또한 분야에 따라 다변'
+  SBERT   : study / sbert 공부 유사도=0.37 > 딴짓=0.27
+  Keyword : unknown / 매칭 키워드 없음
+  => 최종 OCR판정: study
+
+[ test2 - 마인크래프트유튜브+수학노트 ]
+  ResNet  : unknown (100%)
+  OCR text: '오전 10:09 6월 4일 목요일 尙 이름 없는 노트북 (1) 4 00 블럭이 월드에서 지워집니다 . 래덤한 +I十C 兮 650/0 〔-〕 유리계단-발견술-수학2-적분•• 口 9 x (7℃= -교 十C 커 남-부혼 ,쮼 dx= x 77十뙤 十C 1 여기선 1분마다 랜덤'
+  SBERT   : distracted / sbert 딴짓 유사도=0.31 > 공부=0.20
+  Keyword : distracted / 키워드 매칭: 게임
+  => 최종 OCR판정: distracted
+
+[ test3 - 생명과학유튜브+수학노트 ]
+  ResNet  : unknown (97%)
+  OCR text: '오전 10:08 6월 4일 목요일 그라나 +I十C 연반음 C02 尙 00 이 이름 없는 노트북 (1) 4 口 兮 650/0 〔-〕 유리계단-발견술-수학2-적분•• 9 1그 3 x (7℃= -교 十C 1 n十1 커 夭로 1 x -囫十뙤 스트로마 [생명과학2]1단원5-2강'
+  SBERT   : study / sbert 공부 유사도=0.38 > 딴짓=0.15
+  Keyword : unknown / 매칭 키워드 없음
+  => 최종 OCR판정: study
+

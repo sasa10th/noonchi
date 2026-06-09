@@ -31,6 +31,7 @@ socket.on('state', (s) => {
   updateProgressBar(s.focused_time, s.goal_seconds);
   updateDistractionReason(s.focus_state, s.focus_reason);
   updateLumToast(s.lum_toast);
+  updateScreenStatus(s.screen_state, s.screen_reason);
 });
 
 /* View switching */
@@ -228,6 +229,28 @@ function updateDistractionReason(focusState, reason) {
   } else {
     overlay.classList.add('hidden');
   }
+}
+
+/* Tablet screen status */
+function updateScreenStatus(screenState, screenReason) {
+  const pill   = document.getElementById('screen-state-pill');
+  const reason = document.getElementById('screen-reason-text');
+  if (!pill || !reason) return;
+
+  const map = {
+    study:      ['screen-study',      '공부 중'],
+    distracted: ['screen-distracted', '화면 산만'],
+    unknown:    ['screen-unknown',    '—'],
+  };
+  const [cls, label] = map[screenState] || map['unknown'];
+
+  pill.className   = `screen-pill ${cls}`;
+  pill.textContent = label;
+
+  // "iPad 창 없음" 처럼 파이프라인이 진짜 연결 끊김으로 판단한 경우만 표시
+  // 빈 문자열이거나 일시적 에러 메시지면 이유 숨김
+  const isGenuineDisconnect = screenReason === 'iPad 창 없음';
+  reason.textContent = isGenuineDisconnect ? '연결 없음' : (screenState !== 'unknown' ? screenReason : '');
 }
 
 /* Luminance toast */
