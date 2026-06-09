@@ -14,9 +14,28 @@ except ImportError:  # pragma: no cover
 
 
 class WindowScreenCapturer:
-    def __init__(self, window_keyword: str = "iPad"):
-        self.window_keyword = window_keyword
+    # 지원할 태블릿/미러링 창 키워드 (우선순위 순)
+    DEFAULT_KEYWORDS = [
+        "iPad",           # Apple iPad 미러링
+        "Samsung DeX",    # 갤럭시탭 DeX 무선/유선
+        "Samsung Flow",   # Samsung Flow 앱
+        "scrcpy",         # scrcpy 오픈소스 미러링
+        "Phone Link",     # Windows Link to Windows
+        "SM-",            # 갤럭시 기기명 접두어 (SM-X710 등)
+        "Galaxy Tab",     # 일부 앱이 기기명 그대로 표시
+    ]
+
+    def __init__(self, window_keyword: str = None, window_keywords: list = None):
+        # 단일 키워드(하위 호환) 또는 리스트 모두 지원
+        if window_keywords:
+            self.window_keywords = window_keywords
+        elif window_keyword:
+            self.window_keywords = [window_keyword]
+        else:
+            self.window_keywords = self.DEFAULT_KEYWORDS
+
         self._hwnd = None
+        self._matched_keyword = None  # 실제 매칭된 키워드 (UI 표시용)
         ctypes.windll.user32.SetProcessDPIAware()
 
     @property
@@ -24,20 +43,29 @@ class WindowScreenCapturer:
         return win32gui is not None and win32ui is not None
 
     def _find_window(self) -> Optional[int]:
+        """키워드 우선순위대로 창을 탐색, 첫 번째 매칭 HWND 반환."""
         if not self.available:
             return None
 
-        matches = []
-
+        # 모든 가시 창 수집
+        visible = {}
         def callback(hwnd, _):
-            if not win32gui.IsWindowVisible(hwnd):
-                return
-            title = win32gui.GetWindowText(hwnd)
-            if self.window_keyword.lower() in title.lower():
-                matches.append(hwnd)
-
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd)
+                if title:
+                    visible[hwnd] = title.lower()
         win32gui.EnumWindows(callback, None)
-        return matches[0] if matches else None
+
+        # 키워드 우선순위대로 탐색
+        for kw in self.window_keywords:
+            kw_lower = kw.lower()
+            for hwnd, title in visible.items():
+                if kw_lower in title:
+                    self._matched_keyword = kw
+                    return hwnd
+
+        self._matched_keyword = None
+        return None
 
     def capture(self):
         hwnd = self._hwnd if self._hwnd and win32gui and win32gui.IsWindow(self._hwnd) else None

@@ -32,7 +32,7 @@ _SBERT_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 # 의미 분류 기준 앵커 문장
 _STUDY_ANCHOR    = (
-    "수학 공부 강의 문제풀이 과제 교재 수업 학습 필기 증명 정리 해설 "
+    "수학 공부 강의 문제풀이 과제 교재 수업 학습 필기 증명 정리 해설 광합성 "
     "lecture study assignment pdf math physics chemistry biology"
 )
 _DISTRACT_ANCHOR = (

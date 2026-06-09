@@ -56,6 +56,14 @@ classifier = FocusClassifier()
 lum_detector = LuminanceDetector()
 screen_pipeline = None
 
+# 태블릿 분석 전용 스레드 — 카메라 루프와 완전히 분리
+_screen_thread = None
+_screen_thread_running = False
+_screen_cache_lock = threading.Lock()
+_screen_cache = {"state": "unknown", "reason": ""}  # 카메라 루프가 읽는 캐시
+
+SCREEN_ANALYSIS_INTERVAL = 2.0  # 초 (ResNet+OCR+SBERT 합산 시간보다 충분히 길게)
+
 # MediaPipe FaceMesh
 mp_fm = mp.solutions.face_mesh
 face_mesh = mp_fm.FaceMesh(
@@ -227,6 +235,7 @@ def apply_voice_command(command):
             camera_running = True
             camera_thread = threading.Thread(target=camera_loop, daemon=True)
             camera_thread.start()
+        start_screen_thread()
     elif command == 'pause':
         with state_lock:
             if state['phase'] == 'running':
@@ -404,28 +413,61 @@ def get_screen_pipeline():
         return None
 
 
-def apply_screen_judgment(camera_state, camera_reason, now):
+def screen_analysis_loop():
     """
-    Returns (final_state, final_reason, screen_state, screen_reason).
-    - 태블릿은 웹캠 상태와 무관하게 항상 분석 (UI에 별도 표시).
-    - 최종 집중 판정 규칙:
+    태블릿 화면 분석 전용 스레드.
+    카메라 루프(30fps)와 완전히 분리되어, 느린 ResNet/OCR/SBERT가
+    카메라 프레임을 블로킹하지 않음.
+    """
+    global _screen_thread_running
+    pipeline = get_screen_pipeline()
+    if not pipeline:
+        _screen_thread_running = False
+        return
+
+    while _screen_thread_running:
+        t_start = time.time()
+        try:
+            result = pipeline.analyze()
+            with _screen_cache_lock:
+                _screen_cache["state"]  = result.state
+                _screen_cache["reason"] = result.reason
+        except Exception as e:
+            print(f"[Screen] 백그라운드 분석 오류: {e}")
+
+        # 분석에 걸린 시간만큼 인터벌 보정 (최소 0.5초 대기)
+        elapsed = time.time() - t_start
+        sleep_time = max(0.5, SCREEN_ANALYSIS_INTERVAL - elapsed)
+        time.sleep(sleep_time)
+
+
+def start_screen_thread():
+    """세션 시작 시 태블릿 분석 스레드를 켠다."""
+    global _screen_thread, _screen_thread_running
+    if _screen_thread_running:
+        return
+    _screen_thread_running = True
+    _screen_thread = threading.Thread(target=screen_analysis_loop, daemon=True)
+    _screen_thread.start()
+
+
+def apply_screen_judgment(camera_state, camera_reason):
+    """
+    백그라운드 스레드가 채워둔 캐시를 읽어 최종 상태 결정.
+    블로킹 없음 — 캐시 읽기만 수행.
+
+    판정 규칙:
         웹캠 distracted  → 항상 distracted (태블릿 무관)
         웹캠 focused + 태블릿 distracted → distracted
         웹캠 focused + 태블릿 study/unknown → focused 유지
     """
-    pipeline = get_screen_pipeline()
-    if not pipeline:
-        return camera_state, camera_reason, "unknown", ""
+    with _screen_cache_lock:
+        scr_state  = _screen_cache["state"]
+        scr_reason = _screen_cache["reason"]
 
-    result = pipeline.maybe_analyze(now=now)
-    scr_state = result.state
-    scr_reason = result.reason
-
-    # 웹캠이 이미 distracted면 최종 판정은 변하지 않음
     if camera_state != "focused":
         return camera_state, camera_reason, scr_state, scr_reason
 
-    # 웹캠 focused + 태블릿 distracted → 최종 distracted
     if scr_state == "distracted":
         return "distracted", scr_reason, scr_state, scr_reason
 
@@ -540,10 +582,8 @@ def camera_loop():
                         ui_state, reason, scr_state, scr_reason = apply_screen_judgment(
                             ui_state,
                             reason,
-                            time.time(),
                         )
                     except Exception as e:
-                        # 태블릿 분석 실패가 카메라 루프를 죽이지 않도록 방어
                         print(f"[Screen] apply_screen_judgment 예외 (무시됨): {e}")
                         scr_state, scr_reason = "unknown", f"error: {e}"
                     is_focused = (ui_state == "focused")
@@ -675,6 +715,7 @@ def api_start():
         camera_thread = threading.Thread(target=camera_loop, daemon=True)
         camera_thread.start()
 
+    start_screen_thread()
     return jsonify({"ok": True})
 
 
@@ -761,6 +802,7 @@ if __name__ == "__main__":
             camera_running = True
             camera_thread = threading.Thread(target=camera_loop, daemon=True)
             camera_thread.start()
+        start_screen_thread()
         if VOICE_AVAILABLE and not voice_running:
             voice_mode = 'active'
             voice_running = True

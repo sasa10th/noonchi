@@ -21,8 +21,8 @@ class ScreenAnalysisPipeline:
     # 연속 캡처 실패가 이 횟수 이상일 때만 "미연결"로 표시
     DISCONNECT_THRESHOLD = 3
 
-    def __init__(self, window_keyword: str = "iPad", check_interval: float = 1.5):
-        self.window_keyword = window_keyword
+    def __init__(self, window_keyword: str = None, check_interval: float = 1.5):
+        self.window_keyword = window_keyword  # None이면 DEFAULT_KEYWORDS 전체 사용
         self.check_interval = check_interval
         self.capturer = WindowScreenCapturer(window_keyword=window_keyword)
         self.classifier = ScreenClassifier()
@@ -84,11 +84,14 @@ class ScreenAnalysisPipeline:
         # 캡처 성공 → 실패 카운터 초기화
         self._consecutive_failures = 0
 
+        # 매칭된 기기명을 reason 앞에 붙여 UI에서 표시
+        device_tag = f"[{self.capturer._matched_keyword}] " if self.capturer._matched_keyword else ""
+
         label, confidence, classify_reason = self.classifier.classify(frame)
         if label == "study":
             return ScreenAnalysisResult(
                 state="study",
-                reason=classify_reason,
+                reason=f"{device_tag}{classify_reason}",
                 confidence=confidence,
                 source="classifier",
                 checked_at=now,
@@ -96,7 +99,7 @@ class ScreenAnalysisPipeline:
         if label == "distracted":
             return ScreenAnalysisResult(
                 state="distracted",
-                reason=classify_reason,
+                reason=f"{device_tag}{classify_reason}",
                 confidence=confidence,
                 source="classifier",
                 checked_at=now,
@@ -106,7 +109,7 @@ class ScreenAnalysisPipeline:
         if ocr_label in {"study", "distracted"}:
             return ScreenAnalysisResult(
                 state=ocr_label,
-                reason=ocr_reason,
+                reason=f"{device_tag}{ocr_reason}",
                 confidence=confidence,
                 text_preview=preview,
                 source="ocr",
@@ -115,7 +118,7 @@ class ScreenAnalysisPipeline:
 
         return ScreenAnalysisResult(
             state="unknown",
-            reason=f"{classify_reason}; {ocr_reason}",
+            reason=f"{device_tag}{classify_reason}; {ocr_reason}",
             confidence=confidence,
             text_preview=preview,
             source="ocr",
