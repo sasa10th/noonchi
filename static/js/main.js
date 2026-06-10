@@ -6,6 +6,9 @@ let sessions      = [];
 let sidebarVisible = true;  // Sidebar 상태 추적
 let voiceActive    = false;
 let voiceToastTimer = null;
+let isSleepyAlertActive = false;
+let sleepyStartTime = null;
+const SLEEPY_THRESHOLD_MS = 5000;
 
 /* SocketIO */
 const socket = io();
@@ -25,6 +28,12 @@ socket.on('state', (s) => {
   if (currentPhase !== 'running' && currentPhase !== 'paused') return;
 
   updateStatus(s.focus_state);
+  if (s.focus_state === 'sleepy') {
+    if (sleepyStartTime === null) sleepyStartTime = Date.now();
+    else if (Date.now() - sleepyStartTime >= SLEEPY_THRESHOLD_MS) activateSleepyAlert();
+  } else {
+    sleepyStartTime = null;
+  }
   updateDebug(s.ear, s.pitch, s.yaw);
   updateTimer(s.focused_time, s.session_time, s.goal_seconds);
   updateRing(s.focused_time, s.goal_seconds);
@@ -119,6 +128,7 @@ async function resetSession() {
   currentPhase = 'setup';
   isPaused = false;
   updatePauseBtn(false);
+  deactivateSleepyAlert();
   showView('setup');
 }
 
@@ -150,6 +160,7 @@ function updateStatus(focusState) {
   const map = {
     focused:    ['pill-focused',    '집중 중',    'ring-focused'],
     distracted: ['pill-distracted', '집중 아님',  'ring-distracted'],
+    sleepy:     ['pill-sleepy',     '졸음',       'ring-sleepy'],
     no_face:    ['pill-noface',     '얼굴 없음',  ''],
     hold:       ['pill-hold',       '조도 변화',  ''],
   };
@@ -160,6 +171,26 @@ function updateStatus(focusState) {
   text.textContent = label;
 
   ring.className = `cam-ring ${ringCls}`;
+}
+
+/* Sleepy alert */
+function activateSleepyAlert() {
+  if (isSleepyAlertActive) return;
+  isSleepyAlertActive = true;
+  document.getElementById('sleepy-alert').classList.remove('hidden');
+  document.getElementById('sleepy-screen-flash').classList.remove('hidden');
+  setTimeout(() => {
+    const input = document.getElementById('sleepy-input');
+    if (input) input.focus();
+  }, 80);
+}
+
+function deactivateSleepyAlert() {
+  isSleepyAlertActive = false;
+  sleepyStartTime = null;
+  document.getElementById('sleepy-alert').classList.add('hidden');
+  document.getElementById('sleepy-screen-flash').classList.add('hidden');
+  document.getElementById('sleepy-input').value = '';
 }
 
 /* Debug */
@@ -266,6 +297,7 @@ function showCompleted(s) {
   document.getElementById('sum-session').textContent = fmtTime(s.session_time);
   document.getElementById('sum-focused').textContent = fmtTime(s.focused_time);
   document.getElementById('sum-rate').textContent    = rate + '%';
+  deactivateSleepyAlert();
   showView('completed');
 }
 
@@ -398,6 +430,11 @@ function showVoiceToast(text) {
   if (voiceToastTimer) clearTimeout(voiceToastTimer);
   voiceToastTimer = setTimeout(() => toast.classList.add('hidden'), 2500);
 }
+
+/* Sleepy input dismiss */
+document.getElementById('sleepy-input').addEventListener('input', (e) => {
+  if (e.target.value === '집중!!!') deactivateSleepyAlert();
+});
 
 /* Report */
 function renderReport() {

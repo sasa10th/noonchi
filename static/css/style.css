@@ -1,5 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Playfair+Display:ital,wght@0,700;1,500&display=swap');
 
+@font-face {
+  font-family: 'GmarketSans';
+  src: url('/static/fonts/GmarketSansTTFBold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
 *,
 *::before,
 *::after {
@@ -73,7 +80,8 @@ body {
   gap: 8px;
   font-size: 15px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  font-family: 'GmarketSans', sans-serif;
+  letter-spacing: 0;
   cursor: pointer;
   color: var(--white);
   transition: opacity 0.2s;
@@ -158,11 +166,11 @@ body {
 }
 
 .hero-title {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'GmarketSans', sans-serif;
   font-size: clamp(3.5rem, 9vw, 8rem);
   font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   color: var(--white);
   margin-bottom: 1.5rem;
   opacity: 0;
@@ -172,7 +180,6 @@ body {
 .hero-title em {
   font-style: normal;
   color: var(--gray-400);
-  font-weight: 500;
 }
 
 .hero-sub {
@@ -1461,4 +1468,145 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 160px;
+}
+
+/* ── Sleepy state ─────────────────────────────────────────── */
+.pill-sleepy {
+  background: rgba(10, 132, 255, 0.1);
+  border-color: rgba(10, 132, 255, 0.3);
+  color: var(--blue);
+}
+
+.pill-sleepy .pill-dot {
+  background: var(--blue);
+  animation: pulse-blue 0.8s ease-in-out infinite;
+}
+
+@keyframes pulse-blue {
+  0%, 100% { box-shadow: 0 0 4px var(--blue); }
+  50%       { box-shadow: 0 0 14px var(--blue); }
+}
+
+.cam-ring.ring-sleepy {
+  animation: ring-flash-blue 0.8s ease-in-out infinite;
+}
+
+@keyframes ring-flash-blue {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 3px rgba(10, 132, 255, 0.35),
+      inset 0 0 40px rgba(10, 132, 255, 0.08);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 5px rgba(10, 132, 255, 0.9),
+      inset 0 0 70px rgba(10, 132, 255, 0.25);
+  }
+}
+
+/* Full-viewport blue flash */
+.sleepy-screen-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 49;
+  animation: screen-flash-blue 0.5s steps(1, end) infinite;
+}
+
+@keyframes screen-flash-blue {
+  0%,  51% { background: rgba(10, 132, 255, 0.00); }
+  50%       { background: rgba(10, 132, 255, 0.45); }
+}
+
+/* Sleepy alert overlay (inside .cam-panel) */
+.sleepy-alert {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100;
+  pointer-events: all;
+}
+
+.sleepy-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: min(420px, 88%);
+  padding: 48px 40px 44px;
+  background: #18181b;
+  border: 1px solid rgba(10, 132, 255, 0.35);
+  border-radius: 28px;
+  text-align: center;
+  box-shadow:
+    0 0 0 1px rgba(10, 132, 255, 0.08),
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(10, 132, 255, 0.08);
+}
+
+.sleepy-icon-wrap {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 132, 255, 0.1);
+  border: 1px solid rgba(10, 132, 255, 0.2);
+  border-radius: 50%;
+  color: var(--blue);
+  margin-bottom: 28px;
+}
+
+.sleepy-icon-wrap svg {
+  width: 34px;
+  height: 34px;
+}
+
+.sleepy-title {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+
+.sleepy-sub {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.5;
+  margin-bottom: 32px;
+}
+
+.sleepy-input {
+  width: 100%;
+  padding: 15px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  color: var(--white);
+  font-size: 18px;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  letter-spacing: 0.02em;
+}
+
+.sleepy-input:focus {
+  border-color: rgba(10, 132, 255, 0.6);
+  background: rgba(10, 132, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.12);
+}
+
+.sleepy-input::placeholder {
+  color: rgba(255, 255, 255, 0.18);
+  font-weight: 400;
 }

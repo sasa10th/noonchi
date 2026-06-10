@@ -38,7 +38,7 @@ state = {
     "session_time": 0.0,
     "session_start": None,
     "last_tick": None,
-    "focus_state": "no_face",  # focused | distracted | no_face | hold
+    "focus_state": "no_face",  # focused | distracted | sleepy | no_face | hold
     "focus_reason": "",
     "ear": 0.0,
     "pitch": 0.0,
@@ -573,7 +573,7 @@ def camera_loop():
                     )
                     # 상태 변환: model output → UI state
                     state_mapping = {
-                        "sleepy": "distracted",      # 졸음 → 산만함으로 표시
+                        "sleepy": "sleepy",          # 졸음 → 별도 상태 (파란 테두리)
                         "distracted": "distracted",
                         "normal": "focused",
                     }
