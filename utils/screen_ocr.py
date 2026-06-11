@@ -45,7 +45,7 @@ _DISTRACT_ANCHOR = (
 _SIM_GAP_MIN        = 0.03   # 두 유사도 차이가 이 값 미만이면 ambiguous
 _SIM_WIN_MIN        = 0.15   # 이긴 쪽 유사도가 이 값 미만이면 ambiguous
 _SIM_DISTRACT_FORCE = 0.30   # 딴짓 유사도가 이 값 이상이면 공부가 이겨도 딴짓 판정
-_TEXT_LEN_MIN       = 5      # 이 글자 수 미만 텍스트는 SBERT 생략
+_TEXT_LEN_MIN       = 3     # 이 글자 수 미만 텍스트는 SBERT 생략
 
 
 # ── 키워드 리스트 ─────────────────────────────────────────────────────────
