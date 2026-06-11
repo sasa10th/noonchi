@@ -183,6 +183,23 @@
                      placeholder="집중!!!" autocomplete="off" spellcheck="false" />
             </div>
           </div>
+
+          <!-- Distract alert overlay -->
+          <div id="distract-alert" class="distract-alert hidden">
+            <div class="distract-content">
+              <div class="distract-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3a9 9 0 1 0 9 9 9.01 9.01 0 0 0-9-9zm0 16a7 7 0 1 1 7-7 7.008 7.008 0 0 1-7 7z" fill="currentColor" opacity="0.3"/>
+                  <path d="M9.5 10a1 1 0 1 0 1 1 1 1 0 0 0-1-1zm5 0a1 1 0 1 0 1 1 1 1 0 0 0-1-1z" fill="currentColor"/>
+                  <path d="M9 16s1.5-1.5 3-1.5 3 1.5 3 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="distract-title">산만함 감지됨</div>
+              <div class="distract-sub">아래에 입력해서 경보를 해제하세요</div>
+              <input id="distract-input" class="distract-input" type="text"
+                     placeholder="그만 놀게" autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
         </div>
 
         <!-- Stats sidebar -->
@@ -349,6 +366,9 @@
 
     <!-- Sleepy screen flash (fixed, full viewport) -->
     <div id="sleepy-screen-flash" class="sleepy-screen-flash hidden"></div>
+
+    <!-- Distract screen flash (fixed, full viewport) -->
+    <div id="distract-screen-flash" class="distract-screen-flash hidden"></div>
 
     <script src="/static/js/main.js"></script>
   </body>
