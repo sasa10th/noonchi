@@ -45,6 +45,7 @@ class ScreenAnalysisPipeline:
         now = now or time.time()
         try:
             result = self._analyze_inner(now)
+            self._last_result = result  # background thread도 _last_result 갱신
             return result
         except Exception as exc:
             print(f"[Screen] analyze 예외 (무시됨): {exc}")

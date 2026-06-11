@@ -7,8 +7,10 @@ let sidebarVisible = true;  // Sidebar 상태 추적
 let voiceActive    = false;
 let voiceToastTimer = null;
 let isSleepyAlertActive = false;
-let sleepyStartTime = null;
-const SLEEPY_THRESHOLD_MS = 5000;
+let sleepyStartTime     = null;
+let sleepyCooldownTimer = null;          // 짧은 끊김에 타이머 리셋 방지
+const SLEEPY_THRESHOLD_MS  = 5000;
+const SLEEPY_COOLDOWN_MS   = 1500;      // sleepy 벗어나도 이 시간 안에 돌아오면 타이머 유지
 
 /* SocketIO */
 const socket = io();
@@ -29,10 +31,18 @@ socket.on('state', (s) => {
 
   updateStatus(s.focus_state);
   if (s.focus_state === 'sleepy') {
+    // sleepy 상태 진입 or 쿨다운 중 복귀 → 타이머 유지
+    if (sleepyCooldownTimer) { clearTimeout(sleepyCooldownTimer); sleepyCooldownTimer = null; }
     if (sleepyStartTime === null) sleepyStartTime = Date.now();
-    else if (Date.now() - sleepyStartTime >= SLEEPY_THRESHOLD_MS) activateSleepyAlert();
+    else if (!isSleepyAlertActive && Date.now() - sleepyStartTime >= SLEEPY_THRESHOLD_MS) activateSleepyAlert();
   } else {
-    sleepyStartTime = null;
+    // 짧은 끊김은 무시 (SLEEPY_COOLDOWN_MS 내에 돌아오면 타이머 리셋 안 함)
+    if (sleepyStartTime !== null && !sleepyCooldownTimer) {
+      sleepyCooldownTimer = setTimeout(() => {
+        sleepyStartTime     = null;
+        sleepyCooldownTimer = null;
+      }, SLEEPY_COOLDOWN_MS);
+    }
   }
   updateDebug(s.ear, s.pitch, s.yaw);
   updateTimer(s.focused_time, s.session_time, s.goal_seconds);
@@ -187,7 +197,8 @@ function activateSleepyAlert() {
 
 function deactivateSleepyAlert() {
   isSleepyAlertActive = false;
-  sleepyStartTime = null;
+  sleepyStartTime     = null;
+  if (sleepyCooldownTimer) { clearTimeout(sleepyCooldownTimer); sleepyCooldownTimer = null; }
   document.getElementById('sleepy-alert').classList.add('hidden');
   document.getElementById('sleepy-screen-flash').classList.add('hidden');
   document.getElementById('sleepy-input').value = '';
@@ -254,7 +265,7 @@ function updateProgressBar(focused, goal) {
 function updateDistractionReason(focusState, reason) {
   const overlay = document.getElementById('distract-overlay');
   const msg     = document.getElementById('distract-reason');
-  if (focusState === 'distracted' && reason && reason !== '집중 중') {
+  if ((focusState === 'distracted' || focusState === 'sleepy') && reason && reason !== '집중 중') {
     msg.textContent = '⚠ ' + reason;
     overlay.classList.remove('hidden');
   } else {

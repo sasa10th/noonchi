@@ -1426,21 +1426,22 @@ body {
 }
 /* ── Tablet screen status tile ───────────────────────── */
 .stat-tile-screen {
-  padding: 12px 14px;
+  padding: 14px 16px;
 }
 
 .screen-status-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
 }
 
 .screen-pill {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 12px;
   border-radius: 20px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1462,12 +1463,13 @@ body {
 }
 
 .screen-reason {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gray-400);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.4;
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── Sleepy state ─────────────────────────────────────────── */

@@ -62,7 +62,7 @@ _screen_thread_running = False
 _screen_cache_lock = threading.Lock()
 _screen_cache = {"state": "unknown", "reason": ""}  # 카메라 루프가 읽는 캐시
 
-SCREEN_ANALYSIS_INTERVAL = 2.0  # 초 (ResNet+OCR+SBERT 합산 시간보다 충분히 길게)
+SCREEN_ANALYSIS_INTERVAL = 1.5  # 초 — 원래 maybe_analyze check_interval과 동일
 
 # MediaPipe FaceMesh
 mp_fm = mp.solutions.face_mesh
@@ -429,11 +429,14 @@ def screen_analysis_loop():
         t_start = time.time()
         try:
             result = pipeline.analyze()
+            elapsed = time.time() - t_start
+            print(f"[Screen] 분석 완료 → {result.state} ({elapsed:.2f}s) | {result.reason[:60]}")
             with _screen_cache_lock:
                 _screen_cache["state"]  = result.state
                 _screen_cache["reason"] = result.reason
         except Exception as e:
-            print(f"[Screen] 백그라운드 분석 오류: {e}")
+            elapsed = time.time() - t_start
+            print(f"[Screen] 백그라운드 분석 오류 ({elapsed:.2f}s): {e}")
 
         # 분석에 걸린 시간만큼 인터벌 보정 (최소 0.5초 대기)
         elapsed = time.time() - t_start

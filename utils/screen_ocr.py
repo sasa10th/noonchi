@@ -36,14 +36,16 @@ _STUDY_ANCHOR    = (
     "lecture study assignment pdf math physics chemistry biology"
 )
 _DISTRACT_ANCHOR = (
-    "게임 유튜브 인스타그램 SNS 웹툰 주식 쇼핑 영화 드라마 "
-    "game youtube instagram webtoon stock shopping entertainment"
+    "게임 유튜브 인스타그램 SNS 웹툰 주식 쇼핑 영화 드라마 마인크래프트 롤 배그 오버워치 "
+    "game youtube instagram webtoon stock shopping entertainment minecraft league valorant "
+
 )
 
 # SBERT 판정 파라미터
-_SIM_GAP_MIN   = 0.03   # 두 유사도 차이가 이 값 미만이면 ambiguous
-_SIM_WIN_MIN   = 0.15   # 이긴 쪽 유사도가 이 값 미만이면 ambiguous
-_TEXT_LEN_MIN  = 5      # 이 글자 수 미만 텍스트는 SBERT 생략
+_SIM_GAP_MIN        = 0.03   # 두 유사도 차이가 이 값 미만이면 ambiguous
+_SIM_WIN_MIN        = 0.15   # 이긴 쪽 유사도가 이 값 미만이면 ambiguous
+_SIM_DISTRACT_FORCE = 0.30   # 딴짓 유사도가 이 값 이상이면 공부가 이겨도 딴짓 판정
+_TEXT_LEN_MIN       = 5      # 이 글자 수 미만 텍스트는 SBERT 생략
 
 
 # ── 키워드 리스트 ─────────────────────────────────────────────────────────
@@ -55,12 +57,12 @@ DEFAULT_STUDY_WORDS = [
 ]
 
 DEFAULT_BAD_WORDS = [
-    "game", "stock", "youtube",
-    "게임", "주식", "유튜브", "인스타", "웹툰",
+    "game", "stock", "마인크래프트"
+    "게임", "주식", "인스타", "웹툰", "리뷰",
 ]
 
 
-# ── 내부 헬퍼 ─────────────────────────────────────────────────────────────
+
 
 def _load_sbert() -> bool:
     """sentence-transformers 모델을 한 번만 로드."""
@@ -165,9 +167,17 @@ class OCRKeywordClassifier:
             sim_study  = float(st_util.cos_sim(text_vec, _sbert_study_vec))
             sim_bad    = float(st_util.cos_sim(text_vec, _sbert_bad_vec))
 
-            winner     = "study" if sim_study >= sim_bad else "distracted"
-            win_score  = max(sim_study, sim_bad)
-            gap        = abs(sim_study - sim_bad)
+            gap       = abs(sim_study - sim_bad)
+            win_score = max(sim_study, sim_bad)
+
+            # 딴짓 유사도가 강제 임계값 이상이면 공부가 이겨도 딴짓으로 판정
+            # (공부 앱 위에 딴짓 앱이 겹쳐 있는 경우 포착)
+            if sim_bad >= _SIM_DISTRACT_FORCE:
+                return "distracted", (
+                    f"sbert 딴짓 강제 (딴짓={sim_bad:.2f}≥{_SIM_DISTRACT_FORCE}, 공부={sim_study:.2f})"
+                )
+
+            winner = "study" if sim_study >= sim_bad else "distracted"
 
             if gap < _SIM_GAP_MIN or win_score < _SIM_WIN_MIN:
                 return "unknown", (
