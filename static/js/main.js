@@ -12,6 +12,12 @@ let sleepyCooldownTimer = null;          // 짧은 끊김에 타이머 리셋 �
 const SLEEPY_THRESHOLD_MS  = 5000;
 const SLEEPY_COOLDOWN_MS   = 1500;      // sleepy 벗어나도 이 시간 안에 돌아오면 타이머 유지
 
+let isDistractAlertActive = false;
+let distractStartTime     = null;
+let distractCooldownTimer = null;
+const DISTRACT_THRESHOLD_MS = 5000;
+const DISTRACT_COOLDOWN_MS  = 1500;
+
 /* SocketIO */
 const socket = io();
 socket.on('connect',    () => console.log('[FL] 연결됨'));
@@ -35,6 +41,10 @@ socket.on('state', (s) => {
     if (sleepyCooldownTimer) { clearTimeout(sleepyCooldownTimer); sleepyCooldownTimer = null; }
     if (sleepyStartTime === null) sleepyStartTime = Date.now();
     else if (!isSleepyAlertActive && Date.now() - sleepyStartTime >= SLEEPY_THRESHOLD_MS) activateSleepyAlert();
+    // sleepy 진입 시 distract 쿨다운 리셋
+    if (distractStartTime !== null && !distractCooldownTimer) {
+      distractCooldownTimer = setTimeout(() => { distractStartTime = null; distractCooldownTimer = null; }, DISTRACT_COOLDOWN_MS);
+    }
   } else {
     // 짧은 끊김은 무시 (SLEEPY_COOLDOWN_MS 내에 돌아오면 타이머 리셋 안 함)
     if (sleepyStartTime !== null && !sleepyCooldownTimer) {
@@ -42,6 +52,19 @@ socket.on('state', (s) => {
         sleepyStartTime     = null;
         sleepyCooldownTimer = null;
       }, SLEEPY_COOLDOWN_MS);
+    }
+  }
+
+  if (s.focus_state === 'distracted') {
+    if (distractCooldownTimer) { clearTimeout(distractCooldownTimer); distractCooldownTimer = null; }
+    if (distractStartTime === null) distractStartTime = Date.now();
+    else if (!isDistractAlertActive && Date.now() - distractStartTime >= DISTRACT_THRESHOLD_MS) activateDistractAlert();
+  } else {
+    if (distractStartTime !== null && !distractCooldownTimer) {
+      distractCooldownTimer = setTimeout(() => {
+        distractStartTime     = null;
+        distractCooldownTimer = null;
+      }, DISTRACT_COOLDOWN_MS);
     }
   }
   updateDebug(s.ear, s.pitch, s.yaw);
@@ -139,6 +162,7 @@ async function resetSession() {
   isPaused = false;
   updatePauseBtn(false);
   deactivateSleepyAlert();
+  deactivateDistractAlert();
   showView('setup');
 }
 
@@ -202,6 +226,27 @@ function deactivateSleepyAlert() {
   document.getElementById('sleepy-alert').classList.add('hidden');
   document.getElementById('sleepy-screen-flash').classList.add('hidden');
   document.getElementById('sleepy-input').value = '';
+}
+
+/* Distract alert */
+function activateDistractAlert() {
+  if (isDistractAlertActive) return;
+  isDistractAlertActive = true;
+  document.getElementById('distract-alert').classList.remove('hidden');
+  document.getElementById('distract-screen-flash').classList.remove('hidden');
+  setTimeout(() => {
+    const input = document.getElementById('distract-input');
+    if (input) input.focus();
+  }, 80);
+}
+
+function deactivateDistractAlert() {
+  isDistractAlertActive = false;
+  distractStartTime     = null;
+  if (distractCooldownTimer) { clearTimeout(distractCooldownTimer); distractCooldownTimer = null; }
+  document.getElementById('distract-alert').classList.add('hidden');
+  document.getElementById('distract-screen-flash').classList.add('hidden');
+  document.getElementById('distract-input').value = '';
 }
 
 /* Debug */
@@ -309,6 +354,7 @@ function showCompleted(s) {
   document.getElementById('sum-focused').textContent = fmtTime(s.focused_time);
   document.getElementById('sum-rate').textContent    = rate + '%';
   deactivateSleepyAlert();
+  deactivateDistractAlert();
   showView('completed');
 }
 
@@ -445,6 +491,11 @@ function showVoiceToast(text) {
 /* Sleepy input dismiss */
 document.getElementById('sleepy-input').addEventListener('input', (e) => {
   if (e.target.value === '집중!!!') deactivateSleepyAlert();
+});
+
+/* Distract input dismiss */
+document.getElementById('distract-input').addEventListener('input', (e) => {
+  if (e.target.value === '그만 놀게') deactivateDistractAlert();
 });
 
 /* Report */
