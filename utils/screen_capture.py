@@ -17,6 +17,7 @@ class WindowScreenCapturer:
     # 지원할 태블릿/미러링 창 키워드 (우선순위 순)
     DEFAULT_KEYWORDS = [
         "iPad",           # Apple iPad 미러링
+        "무선 디스플레이",
         "Samsung DeX",    # 갤럭시탭 DeX 무선/유선
         "Samsung Flow",   # Samsung Flow 앱
         "scrcpy",         # scrcpy 오픈소스 미러링
