@@ -19,6 +19,37 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+      /* 웹 버전 카메라 레이어 */
+      #cam-video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+      #cam-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        transform: scaleX(-1);
+        z-index: 1;
+        pointer-events: none;
+      }
+      #cam-init-msg {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        color: rgba(255,255,255,0.45);
+        z-index: 2;
+        pointer-events: none;
+      }
+    </style>
   </head>
   <body>
 
@@ -57,7 +88,6 @@
 
       <!-- Hero Section -->
       <section class="hero-section">
-        <!-- Ambient background -->
         <div class="hero-blobs">
           <div class="blob blob-1"></div>
           <div class="blob blob-2"></div>
@@ -65,10 +95,8 @@
         </div>
         <div class="hero-grid"></div>
 
-        <!-- Hero Avatar -->
         <canvas id="hero-avatar-canvas"></canvas>
 
-        <!-- Content -->
         <div class="hero-content">
           <div class="hero-badge">
             <span class="badge-dot"></span>
@@ -93,7 +121,6 @@
             </button>
           </div>
 
-          <!-- Feature pills -->
           <div class="feature-pills">
             <div class="feature-pill">
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
@@ -112,24 +139,20 @@
             </div>
             <div class="feature-pill">
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                <rect x="4" y="1" width="6" height="7.5" rx="3" stroke="currentColor" stroke-width="1.3" fill="none"/>
-                <path d="M2 8a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                <line x1="7" y1="13" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                <path d="M2 3h10M2 7h7M2 11h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
               </svg>
-              음성 명령 지원
+              세션 리포트
             </div>
             <div class="feature-pill">
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                <rect x="0.8" y="1" width="12.4" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
-                <line x1="4" y1="10" x2="10" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                <line x1="7" y1="10" x2="7" y2="13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/>
+                <path d="M4.5 7h5M7 4.5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
               </svg>
-              태블릿 화면 분석
+              모바일 지원
             </div>
           </div>
         </div>
 
-        <!-- Scroll hint -->
         <div class="scroll-hint">
           <div class="scroll-arrow">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -158,15 +181,7 @@
           </div>
 
           <div class="sheet-actions">
-            <button class="btn-voice-setup" id="btn-voice-setup" onclick="toggleVoice()">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
-                <path d="M2 7.5a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                <line x1="7" y1="12.5" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              </svg>
-              <span id="voice-setup-label">음성 명령</span>
-            </button>
-            <button class="btn-config-start" id="btn-start-2">
+            <button class="btn-config-start" id="btn-start-2" style="width:100%">
               <span>타이머 시작</span>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -198,24 +213,10 @@
             </svg>
             <span id="pause-label">일시정지</span>
           </button>
-          <button class="focus-btn" id="btn-overlay" onclick="toggleOverlay()" title="마스크 표시/숨김">
+          <button class="focus-btn" id="btn-overlay" onclick="handleOverlayToggle()" title="마스크 표시/숨김">
             <svg id="overlay-icon" width="13" height="13" viewBox="0 0 14 14" fill="none">
               <ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/>
               <circle cx="7" cy="7" r="2" fill="currentColor"/>
-            </svg>
-          </button>
-          <button class="focus-btn" id="btn-voice-focus" onclick="toggleVoice()" title="음성 명령">
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
-              <path d="M2 7.5a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              <line x1="7" y1="12.5" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            </svg>
-          </button>
-          <button class="focus-btn" id="btn-popup" title="미니 팝업 (항상 최상위)">
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"/>
-              <circle cx="7" cy="6.5" r="2.3" stroke="currentColor" stroke-width="1.1" fill="none"/>
-              <line x1="7" y1="8.8" x2="7" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
             </svg>
           </button>
           <button class="focus-btn" id="btn-toggle-sidebar" onclick="toggleSidebar()" title="정보판 표시/숨김">
@@ -236,14 +237,6 @@
 
       <!-- Toasts -->
       <div id="lum-toast" class="lum-toast hidden">⚠ 조도 변화 감지 — 판정 보류 중</div>
-      <div id="voice-toast" class="voice-toast hidden">
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-          <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
-          <path d="M2 7.5a5 5 0 0 0 10 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-          <line x1="7" y1="12.5" x2="7" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-        <span id="voice-toast-text"></span>
-      </div>
 
       <!-- Monitor grid -->
       <div class="monitor-grid">
@@ -251,7 +244,11 @@
         <!-- Camera -->
         <div class="cam-panel">
           <canvas id="avatar-canvas"></canvas>
-          <img id="cam-feed" src="/video_feed" alt="" />
+
+          <!-- 웹 버전: 로컬 카메라 video + 오버레이 canvas -->
+          <video id="cam-video" autoplay muted playsinline></video>
+          <canvas id="cam-canvas"></canvas>
+          <div id="cam-init-msg">카메라 초기화 중…</div>
 
           <div id="distract-overlay" class="distract-overlay hidden">
             <div id="distract-reason" class="distract-msg"></div>
@@ -259,7 +256,6 @@
 
           <div id="cam-state-ring" class="cam-ring"></div>
 
-          <!-- Bottom HUD -->
           <div class="cam-status-hud">
             <div class="cam-hud-inner">
               <div class="cam-hud-state" id="cam-hud-state-text">대기 중</div>
@@ -267,7 +263,7 @@
             </div>
           </div>
 
-          <!-- Sleepy alert overlay -->
+          <!-- Sleepy alert -->
           <div id="sleepy-alert" class="sleepy-alert hidden">
             <div class="sleepy-content">
               <div class="sleepy-icon-wrap">
@@ -285,7 +281,7 @@
             </div>
           </div>
 
-          <!-- Distract alert overlay -->
+          <!-- Distract alert -->
           <div id="distract-alert" class="distract-alert hidden">
             <div class="distract-content">
               <div class="distract-icon-wrap">
@@ -306,7 +302,6 @@
         <!-- Stats Sidebar -->
         <div class="stats-sidebar">
 
-          <!-- Ring progress -->
           <div class="sidebar-section">
             <div class="sidebar-section-label">집중 시간</div>
             <div class="ring-module">
@@ -334,7 +329,6 @@
             </div>
           </div>
 
-          <!-- Session elapsed -->
           <div class="sidebar-section">
             <div class="sidebar-section-label">세션 경과</div>
             <div class="session-time-big" id="session-time">00:00</div>
@@ -350,7 +344,6 @@
             </div>
           </div>
 
-          <!-- Live metrics -->
           <div class="sidebar-section">
             <div class="sidebar-section-label">실시간 측정</div>
             <div class="metric-bar">
@@ -373,21 +366,6 @@
                 <div class="metric-fill" id="yaw-bar" style="width:50%"></div>
               </div>
               <span class="metric-val" id="d-yaw">—</span>
-            </div>
-          </div>
-
-          <!-- Tablet status -->
-          <div class="sidebar-section" id="screen-tile">
-            <div class="sidebar-section-label">
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="margin-right:5px;vertical-align:-1px;opacity:0.5">
-                <rect x="0.6" y="0.6" width="9.8" height="7.5" rx="1.4" stroke="currentColor" stroke-width="1.1" fill="none"/>
-                <line x1="3.5" y1="8.1" x2="7.5" y2="8.1" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
-                <line x1="5.5" y1="8.1" x2="5.5" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
-              </svg>태블릿 화면
-            </div>
-            <div class="screen-status-row">
-              <span id="screen-state-pill" class="screen-pill screen-unknown">—</span>
-              <span id="screen-reason-text" class="screen-reason">태블릿 미연결</span>
             </div>
           </div>
 
@@ -526,5 +504,31 @@
     <script type="module" src="/static/js/avatar-vrm.js"></script>
     <script type="module" src="/static/js/hero-avatar.js"></script>
     <script type="module" src="/static/js/loading-vrm.js"></script>
+    <!-- 브라우저 카메라 + MediaPipe 얼굴 감지 -->
+    <script type="module" src="/static/js/face-client.js"></script>
+
+    <script>
+      /* 웹 버전 오버레이 토글 — 클라이언트 측 처리 */
+      function handleOverlayToggle() {
+        const show = window.toggleOverlayClient?.();
+        const btn  = document.getElementById('btn-overlay');
+        const icon = document.getElementById('overlay-icon');
+        if (!btn || !icon) return;
+        if (show === false) {
+          btn.classList.add('overlay-off');
+          icon.innerHTML = `
+            <ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/>
+            <line x1="2" y1="2" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>`;
+        } else {
+          btn.classList.remove('overlay-off');
+          icon.innerHTML = `
+            <ellipse cx="7" cy="7" rx="6" ry="4" stroke="currentColor" stroke-width="1.3"/>
+            <circle cx="7" cy="7" r="2" fill="currentColor"/>`;
+        }
+      }
+
+      /* main.js의 updateScreenStatus가 없는 요소를 참조해도 안전하게 처리 */
+      window.__webMode = true;
+    </script>
   </body>
 </html>

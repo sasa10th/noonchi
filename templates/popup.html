@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>눈치 미니</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three":         "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/",
+      "@pixiv/three-vrm": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.2/lib/three-vrm.module.js"
+    }
+  }
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0; padding: 0;
+      background: rgba(12, 12, 20, 0.93);
+      overflow: hidden;
+      user-select: none;
+      font-family: 'Inter', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .popup-root {
+      width: 100%;
+      background: rgba(12, 12, 20, 0.93);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255,255,255,0.06) inset;
+      overflow: hidden;
+    }
+
+    /* ── 아바타 영역 ── */
+    .avatar-zone {
+      position: relative;
+      width: 100%;
+      height: 210px;
+      cursor: grab;
+    }
+    .avatar-zone:active { cursor: grabbing; }
+
+    #avatar-canvas {
+      width: 100%;
+      height: 210px;
+      display: block;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      border-radius: 50%;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+      z-index: 10;
+    }
+    .close-btn:hover {
+      background: rgba(239, 68, 68, 0.7);
+      color: #fff;
+    }
+
+    /* 상태 미니 도트 */
+    .state-dot {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #6b7280;
+      transition: background 0.4s;
+      box-shadow: 0 0 6px currentColor;
+    }
+    .state-dot.focused    { background: #22c55e; }
+    .state-dot.distracted { background: #ef4444; }
+    .state-dot.sleepy      { background: #60a5fa; }
+    .state-dot.hold       { background: #eab308; }
+
+    /* ── 정보 패널 (접힘/펼침) ── */
+    .info-panel {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .info-panel.expanded {
+      max-height: 140px;
+    }
+
+    .info-inner {
+      padding: 10px 14px 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    /* 상태 pill */
+    .state-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px 3px 7px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-bottom: 9px;
+      background: rgba(107, 114, 128, 0.18);
+      color: #9ca3af;
+      transition: background 0.4s, color 0.4s;
+    }
+    .state-pill .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .state-pill.focused    { background: rgba(34,197,94,0.18);  color: #4ade80; }
+    .state-pill.distracted { background: rgba(239,68,68,0.18);  color: #f87171; }
+    .state-pill.sleepy      { background: rgba(96,165,250,0.18); color: #93c5fd; }
+    .state-pill.hold       { background: rgba(234,179,8,0.18);  color: #fbbf24; }
+
+    /* 시간 표시 */
+    .time-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 7px;
+    }
+    .time-focused {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f1f5f9;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .time-sep { color: rgba(255,255,255,0.25); font-size: 14px; }
+    .time-goal {
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 진행바 */
+    .prog-wrap {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 7px;
+    }
+    .prog-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #22c55e, #4ade80);
+      transition: width 0.8s ease, background 0.4s;
+    }
+    .prog-fill.distracted { background: linear-gradient(90deg, #ef4444, #f87171); }
+    .prog-fill.sleepy      { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .prog-fill.done       { background: linear-gradient(90deg, #eab308, #fbbf24); }
+
+    /* 세션 시간 */
+    .session-row {
+      font-size: 10.5px;
+      color: rgba(255,255,255,0.28);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .session-label { color: rgba(255,255,255,0.18); }
+    .session-val   { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div class="popup-root">
+    <div class="avatar-zone" id="drag-zone">
+      <canvas id="avatar-canvas"></canvas>
+      <div class="state-dot" id="mini-dot"></div>
+      <button class="close-btn" id="close-btn">✕</button>
+    </div>
+
+    <div class="info-panel" id="info-panel">
+      <div class="info-inner">
+        <div class="state-pill" id="state-pill">
+          <span class="dot"></span>
+          <span id="state-text">대기 중</span>
+        </div>
+
+        <div class="time-row">
+          <span class="time-focused" id="time-focused">00:00</span>
+          <span class="time-sep">/</span>
+          <span class="time-goal" id="time-goal">--:--</span>
+        </div>
+
+        <div class="prog-wrap">
+          <div class="prog-fill" id="prog-fill"></div>
+        </div>
+
+        <div class="session-row">
+          <span class="session-label">세션</span>
+          <span class="session-val" id="session-val">00:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ── 시간 포맷 ── */
+    function fmtTime(s) {
+      s = Math.max(0, Math.floor(s));
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    }
+
+    /* ── 상태 색상 맵 ── */
+    const STATE_LABELS = {
+      focused: '집중 중', distracted: '산만함', sleepy: '졸음',
+      no_face: '얼굴 없음', hold: '판정 보류',
+    };
+
+    let expanded = false;
+    let dragging = false, hasDragged = false, lastX = 0, lastY = 0;
+
+    /* ── [개선] 켜지자마자 초기 윈도우 크기 강제 매칭 ── */
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        if (window.pywebview) {
+          window.pywebview.api.resize_window(212); // 접힌 크기인 212px 초기 강제 주입
+        }
+      }, 100);
+    });
+
+    /* ── [개선] 마우스 제어 구조 세분화 (드래그와 클릭 분리) ── */
+    document.addEventListener('mousedown', e => {
+      if (e.target.id === 'close-btn') return;
+      dragging = true;
+      hasDragged = false; // 새로 누를 때 드래그 여부 초기화
+      lastX = e.screenX;
+      lastY = e.screenY;
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dx = e.screenX - lastX;
+      const dy = e.screenY - lastY;
+      
+      // 미세한 마우스 미끄러짐 방지 (최소 1px 이상 움직였을 때만 드래그로 인정)
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        hasDragged = true;
+      }
+      
+      lastX = e.screenX;
+      lastY = e.screenY;
+      if (window.pywebview) {
+        window.pywebview.api.move_window(dx, dy);
+      }
+    });
+
+    document.addEventListener('mouseup', () => { 
+      dragging = false; 
+    });
+
+    /* ── 아바타 클릭 → 펼치기/접기 ── */
+    document.getElementById('drag-zone').addEventListener('click', e => {
+      if (e.target.id === 'close-btn') return;
+      if (hasDragged) return; // [핵심] 윈도우를 드래그한 경우에는 폴더가 열리지 않도록 차단!
+
+      expanded = !expanded;
+      document.getElementById('info-panel').classList.toggle('expanded', expanded);
+      const newH = expanded ? 337 : 212;
+      if (window.pywebview) {
+        window.pywebview.api.resize_window(newH);
+      }
+    });
+
+    /* ── 닫기 ── */
+    document.getElementById('close-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      if (window.pywebview) {
+        window.pywebview.api.close_popup();
+      }
+    });
+
+    /* ── Socket.IO 상태 수신 ── */
+    const socket = io('http://localhost:5000');
+
+    socket.on('state', data => {
+      const fs = data.focus_state || 'no_face';
+
+      /* 미니 도트 */
+      const dot = document.getElementById('mini-dot');
+      dot.className = 'state-dot ' + fs;
+
+      /* 상태 pill */
+      const pill = document.getElementById('state-pill');
+      pill.className = 'state-pill ' + fs;
+      document.getElementById('state-text').textContent = STATE_LABELS[fs] || fs;
+
+      /* 시간 */
+      document.getElementById('time-focused').textContent = fmtTime(data.focused_time || 0);
+      document.getElementById('time-goal').textContent    = fmtTime(data.goal_seconds  || 0);
+      document.getElementById('session-val').textContent  = fmtTime(data.session_time  || 0);
+
+      /* 진행바 */
+      const pct = data.goal_seconds > 0
+        ? Math.min(100, (data.focused_time / data.goal_seconds) * 100)
+        : 0;
+      const fill = document.getElementById('prog-fill');
+      fill.style.width = pct + '%';
+      fill.className = 'prog-fill ' + (pct >= 100 ? 'done' : fs);
+
+      /* VRM 표정 */
+      if (window.popupVRM) window.popupVRM.setFocusState(fs);
+    });
+  </script>
+  <script type="module" src="http://localhost:5000/static/js/popup-vrm.js"></script>
+</body>
+</html>

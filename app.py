@@ -10,9 +10,19 @@ import re
 import threading
 import base64
 import json
+import subprocess
+import sys
+import os
+import difflib
 from collections import deque
 from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
+
+# PyInstaller 동결 여부에 따라 베이스 경로 결정
+if getattr(sys, 'frozen', False):
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
     import speech_recognition as sr
@@ -26,8 +36,13 @@ from utils.ear_calculator import compute_ear
 from utils.focus_classifier import FocusClassifier
 from utils.luminance import LuminanceDetector
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, 'templates'),
+    static_folder=os.path.join(BASE_DIR, 'static'),
+)
 app.config["SECRET_KEY"] = "noonchi-secret"
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # 전역 상태
@@ -109,57 +124,60 @@ VOICE_WAKE_WORDS = [
 
 VOICE_COMMANDS = {
     # -----------------------------------------------------------------
-    # START (시작 / 집중)
+    # START
     # -----------------------------------------------------------------
-    '시작': 'start', '시작해': 'start', '시작해줘': 'start', '고': 'start',
-    '집중 시작': 'start', '집중해': 'start', '집중': 'start', '집중 모드': 'start',
-    '공부 시작': 'start', '타이머 시작': 'start', '시작하자': 'start',
-    
+    '시작': 'start', '시작해': 'start', '시작해줘': 'start', '시작하자': 'start',
+    '고': 'start', '집중 시작': 'start', '집중해': 'start', '집중': 'start',
+    '집중 모드': 'start', '집중할게': 'start', '공부 시작': 'start',
+    '공부해': 'start', '공부할게': 'start', '타이머 시작': 'start',
+    '시작할게': 'start', '해볼게': 'start', '달려': 'start',
+
     # -----------------------------------------------------------------
-    # PAUSE (일시정지 / 멈춤)
+    # PAUSE
     # -----------------------------------------------------------------
     '일시정지': 'pause', '일시 정지': 'pause', '일시정지해줘': 'pause',
-    '멈춰': 'pause', '정지': 'pause', '멈춤': 'pause', '잠깐': 'pause', 
-    '잠시만': 'pause', '잠깐만': 'pause', '기다려': 'pause', '타임': 'pause',
-    '쉬기': 'pause', '휴식': 'pause',
-    
+    '멈춰': 'pause', '멈춰줘': 'pause', '정지': 'pause', '멈춤': 'pause',
+    '잠깐': 'pause', '잠시만': 'pause', '잠깐만': 'pause', '잠시': 'pause',
+    '기다려': 'pause', '타임': 'pause', '쉬기': 'pause', '휴식': 'pause',
+    '쉴게': 'pause', '쉬자': 'pause', '잠깐 쉴게': 'pause',
+
     # -----------------------------------------------------------------
-    # RESUME (재개 / 다시 시작)
+    # RESUME
     # -----------------------------------------------------------------
-    '재개': 'resume', '다시 재개': 'resume', '계속': 'resume', '계속해': 'resume', 
-    '계속하자': 'resume', '다시': 'resume', '다시 시작': 'resume', '다시시작': 'resume', 
-    '이어서': 'resume', '이어서 시작': 'resume', '플레이': 'resume',
-    
+    '재개': 'resume', '다시 재개': 'resume', '계속': 'resume', '계속해': 'resume',
+    '계속하자': 'resume', '계속할게': 'resume', '다시': 'resume',
+    '다시 시작': 'resume', '이어서': 'resume', '이어서 시작': 'resume',
+    '플레이': 'resume', '고고': 'resume', '다시 집중': 'resume',
+
     # -----------------------------------------------------------------
-    # RESET (초기화 / 종료)
+    # RESET
     # -----------------------------------------------------------------
     '초기화': 'reset', '리셋': 'reset', '리셋해줘': 'reset', '처음부터': 'reset',
-    '종료': 'reset', '종료해': 'reset', '끝내': 'reset', '끝': 'reset', 
+    '종료': 'reset', '종료해': 'reset', '끝내': 'reset', '끝': 'reset',
     '그만': 'reset', '그만해': 'reset', '취소': 'reset', '클리어': 'reset',
-    
+    '오늘 끝': 'reset', '공부 끝': 'reset', '다 끝났어': 'reset',
+
     # -----------------------------------------------------------------
-    # OVERLAY ON (마스크 / 필터 켜기)
+    # OVERLAY ON
     # -----------------------------------------------------------------
-    '마스크 켜': 'overlay_on', '마스크 켜줘': 'overlay_on', '마스크 표시': 'overlay_on', 
+    '마스크 켜': 'overlay_on', '마스크 켜줘': 'overlay_on', '마스크 표시': 'overlay_on',
     '필터 켜': 'overlay_on', '필터 켜줘': 'overlay_on', '필터 표시': 'overlay_on',
     '화면 마스크': 'overlay_on', '화면 필터': 'overlay_on', '마스크 보이기': 'overlay_on',
-    # 띄어쓰기 오류 방지
     '마스크켜': 'overlay_on', '필터켜': 'overlay_on',
-    
+
     # -----------------------------------------------------------------
-    # OVERLAY OFF (마스크 / 필터 끄기)
+    # OVERLAY OFF
     # -----------------------------------------------------------------
-    '마스크 꺼': 'overlay_off', '마스크 꺼줘': 'overlay_off', '마스크 숨겨': 'overlay_off', 
+    '마스크 꺼': 'overlay_off', '마스크 꺼줘': 'overlay_off', '마스크 숨겨': 'overlay_off',
     '필터 꺼': 'overlay_off', '필터 꺼줘': 'overlay_off', '필터 숨겨': 'overlay_off',
     '마스크 해제': 'overlay_off', '필터 해제': 'overlay_off', '마스크 안보이게': 'overlay_off',
-    # 띄어쓰기 오류 방지
     '마스크꺼': 'overlay_off', '필터꺼': 'overlay_off',
-    
+
     # -----------------------------------------------------------------
-    # OVERLAY TOGGLE (마스크 전환)
+    # OVERLAY TOGGLE
     # -----------------------------------------------------------------
     '마스크': 'overlay_toggle', '필터': 'overlay_toggle', '마스크 전환': 'overlay_toggle',
-    '필터 전환': 'overlay_toggle', '반전': 'overlay_toggle'
+    '필터 전환': 'overlay_toggle', '반전': 'overlay_toggle',
 }
 
 # 얼굴 랜드마크 오버레이
@@ -203,18 +221,113 @@ FACE_OVAL_IDX = [
 ]
 
 
-def parse_time_from_text(text):
+# 한국어 숫자 말하기 → 분(minutes) 직접 매핑
+_KOR_TIME_LOOKUP: dict[str, int] = {
+    # 분 단위
+    '오분': 5,     '오 분': 5,
+    '십분': 10,    '십 분': 10,
+    '십오분': 15,  '십오 분': 15,
+    '이십분': 20,  '이십 분': 20,
+    '이십오분': 25,'이십오 분': 25,
+    '삼십분': 30,  '삼십 분': 30,  '반시간': 30, '반 시간': 30,
+    '삼십오분': 35,'삼십오 분': 35,
+    '사십분': 40,  '사십 분': 40,
+    '사십오분': 45,'사십오 분': 45,
+    '오십분': 50,  '오십 분': 50,
+    '오십오분': 55,'오십오 분': 55,
+    '육십분': 60,  '육십 분': 60,
+    # 시간 단위
+    '한시간': 60,  '한 시간': 60,  '일시간': 60,  '일 시간': 60,
+    '두시간': 120, '두 시간': 120, '이시간': 120, '이 시간': 120,
+    '세시간': 180, '세 시간': 180,
+    # 혼합
+    '한시간반': 90,   '한 시간 반': 90,
+    '두시간반': 150,  '두 시간 반': 150,
+    '한시간이십분': 80, '한 시간 이십 분': 80,
+    '한시간삼십분': 90, '한 시간 삼십 분': 90,
+}
+
+# STT 오인식 보정 맵 (틀린표현 → 올바른표현)
+_STT_CORRECTIONS: dict[str, str] = {
+    '멈쳐': '멈춰', '멈춰요': '멈춰',
+    '재계': '재개', '제개': '재개', '재계속': '재개',
+    '일시 정지': '일시정지', '일시정지해': '일시정지',
+    '다시시작': '다시 시작', '다시 시작해': '다시 시작',
+    '마스크켜줘': '마스크 켜줘', '마스크꺼줘': '마스크 꺼줘',
+    '필터켜줘': '필터 켜줘', '필터꺼줘': '필터 꺼줘',
+    '음성켜줘': '음성 켜줘', '음성꺼줘': '음성 꺼줘',
+    '고우': '고', '고요': '고',
+    '시작해요': '시작해', '시작할게': '시작',
+    '그만할게': '그만', '그만해요': '그만',
+    '계속해요': '계속해', '계속할게': '계속',
+    '잠깐요': '잠깐', '잠시요': '잠시만',
+}
+
+
+def _normalize_text(text: str) -> str:
+    """STT 결과 정규화 — 공백 정리 + 오인식 보정."""
+    text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
+    for wrong, right in _STT_CORRECTIONS.items():
+        text = text.replace(wrong, right)
+    return text
+
+
+def parse_time_from_text(text: str):
     """한국어 음성에서 목표 시간(분)을 파싱. 없으면 None 반환."""
+    # 1) 한국어 숫자 표현 직접 매핑 (긴 표현부터 확인)
+    for expr, mins in sorted(_KOR_TIME_LOOKUP.items(), key=lambda x: -len(x[0])):
+        if expr in text:
+            return max(5, min(180, mins))
+    # 2) 아라비아 숫자 패턴
     m = re.search(r'(\d+)\s*시간\s*(\d+)\s*분', text)
     if m:
-        return max(5, min(120, int(m.group(1)) * 60 + int(m.group(2))))
+        return max(5, min(180, int(m.group(1)) * 60 + int(m.group(2))))
     m = re.search(r'(\d+)\s*시간', text)
     if m:
-        return max(5, min(120, int(m.group(1)) * 60))
+        return max(5, min(180, int(m.group(1)) * 60))
     m = re.search(r'(\d+)\s*분', text)
     if m:
-        return max(5, min(120, int(m.group(1))))
+        return max(5, min(180, int(m.group(1))))
     return None
+
+
+def _match_words(text: str, word_list: list[str], fuzzy_threshold: float = 0.82) -> bool:
+    """단어 목록 중 하나가 text에 포함되거나 유사하면 True 반환."""
+    for w in word_list:
+        if w in text:
+            return True
+    # 유사도 검사: 텍스트를 단어 n-gram으로 쪼개 비교
+    tokens = text.split()
+    for size in range(min(len(tokens), 4), 0, -1):
+        for i in range(len(tokens) - size + 1):
+            chunk = ' '.join(tokens[i:i + size])
+            for w in word_list:
+                if difflib.SequenceMatcher(None, chunk, w).ratio() >= fuzzy_threshold:
+                    return True
+    return False
+
+
+def _match_command(text: str, commands: dict[str, str],
+                   fuzzy_threshold: float = 0.80) -> str | None:
+    """명령어 딕셔너리에서 text와 가장 잘 맞는 명령 반환.
+    먼저 exact substring, 그 다음 유사도 기반 매칭.
+    """
+    # 1) exact substring (기존 방식, 빠름)
+    for keyword, cmd in commands.items():
+        if keyword in text:
+            return cmd
+    # 2) 유사도 기반 — 가장 높은 비율의 명령어 반환
+    best_cmd, best_ratio = None, fuzzy_threshold
+    tokens = text.split()
+    for size in range(min(len(tokens), 4), 0, -1):
+        for i in range(len(tokens) - size + 1):
+            chunk = ' '.join(tokens[i:i + size])
+            for keyword, cmd in commands.items():
+                ratio = difflib.SequenceMatcher(None, chunk, keyword).ratio()
+                if ratio > best_ratio:
+                    best_ratio, best_cmd = ratio, cmd
+    return best_cmd
 
 
 def apply_voice_command(command):
@@ -270,18 +383,34 @@ def _emit_voice(active, mode, listening, **extra):
     socketio.emit('voice_status', {'active': active, 'mode': mode, 'listening': listening, **extra})
 
 
+def _make_recognizer() -> 'sr.Recognizer':
+    """인식 파라미터가 최적화된 Recognizer 생성."""
+    r = sr.Recognizer()
+    r.energy_threshold = 300          # 초기값 (dynamic이 빠르게 재조정)
+    r.dynamic_energy_threshold = True
+    r.dynamic_energy_adjustment_damping = 0.10  # 기본 0.15 → 더 빠른 적응
+    r.pause_threshold = 0.5           # 기본 0.8 → 끝말 감지 빠르게
+    r.non_speaking_duration = 0.3     # 기본 0.5 → 묵음 판단 빠르게
+    r.phrase_threshold = 0.1
+    return r
+
+
 def voice_loop():
     global voice_running, voice_mode
     if not VOICE_AVAILABLE:
         return
 
-    r = sr.Recognizer()
-    r.dynamic_energy_threshold = True
+    _RECAL_AFTER = 8   # 연속 UnknownValueError 이 횟수면 노이즈 재보정
+    fail_count = 0
+
+    r = _make_recognizer()
 
     try:
         with sr.Microphone() as source:
             _emit_voice(True, voice_mode, False)
-            r.adjust_for_ambient_noise(source, duration=1)
+            print('[Voice] 주변 소음 보정 중...')
+            r.adjust_for_ambient_noise(source, duration=1.5)
+            print(f'[Voice] 에너지 임계값: {r.energy_threshold:.0f}')
 
             while voice_running:
                 is_wake = (voice_mode == 'wake')
@@ -289,18 +418,23 @@ def voice_loop():
                     if not is_wake:
                         _emit_voice(True, 'active', True)
 
-                    audio = r.listen(source, timeout=5,
-                                     phrase_time_limit=2 if is_wake else 5)
+                    audio = r.listen(
+                        source,
+                        timeout=6,
+                        phrase_time_limit=3 if is_wake else 7,
+                    )
 
                     if not is_wake:
                         _emit_voice(True, 'active', False)
 
-                    text = r.recognize_google(audio, language='ko-KR').strip()
-                    print(f'[Voice] [{voice_mode}] 인식: {text}')
+                    raw = r.recognize_google(audio, language='ko-KR').strip()
+                    text = _normalize_text(raw)
+                    print(f'[Voice] [{voice_mode}] 원문: {raw!r}  정규화: {text!r}')
+                    fail_count = 0  # 성공 시 카운터 리셋
 
-                    # ── wake 모드: 활성화 키워드만 감지 ──
+                    # ── wake 모드: 활성화 키워드 감지 ──
                     if is_wake:
-                        if any(w in text for w in VOICE_WAKE_WORDS):
+                        if _match_words(text, VOICE_WAKE_WORDS, fuzzy_threshold=0.80):
                             voice_mode = 'active'
                             _emit_voice(True, 'active', False)
                         continue
@@ -308,27 +442,22 @@ def voice_loop():
                     # ── active 모드: 전체 명령 처리 ──
 
                     # 1) 음성 끄기
-                    if any(w in text for w in VOICE_SLEEP_WORDS):
+                    if _match_words(text, VOICE_SLEEP_WORDS, fuzzy_threshold=0.80):
                         voice_mode = 'wake'
                         _emit_voice(True, 'wake', False)
                         socketio.emit('voice_command', {'command': 'voice_off', 'text': text})
                         continue
 
-                    # 2) 시간 설정 (N분 / N시간 패턴 우선)
+                    # 2) 시간 설정
                     minutes = parse_time_from_text(text)
                     if minutes:
                         with state_lock:
                             state['goal_seconds'] = minutes * 60
                         socketio.emit('voice_command',
                                       {'command': 'set_time', 'text': text, 'minutes': minutes})
-                        # 시간 설정과 함께 시작 명령도 있으면 계속 진행
 
-                    # 3) 액션 명령
-                    command = None
-                    for keyword, cmd in VOICE_COMMANDS.items():
-                        if keyword in text:
-                            command = cmd
-                            break
+                    # 3) 액션 명령 (exact + fuzzy)
+                    command = _match_command(text, VOICE_COMMANDS, fuzzy_threshold=0.80)
                     if command:
                         socketio.emit('voice_command', {'command': command, 'text': text})
                         apply_voice_command(command)
@@ -336,11 +465,27 @@ def voice_loop():
                 except sr.WaitTimeoutError:
                     if not is_wake:
                         _emit_voice(True, voice_mode, False)
+
                 except sr.UnknownValueError:
+                    fail_count += 1
                     if not is_wake:
                         _emit_voice(True, voice_mode, False)
+                    # 연속 실패 시 노이즈 재보정 (마이크 환경 변화 대응)
+                    if fail_count >= _RECAL_AFTER:
+                        print(f'[Voice] 연속 {fail_count}회 인식 실패 — 노이즈 재보정')
+                        try:
+                            r.adjust_for_ambient_noise(source, duration=0.8)
+                            print(f'[Voice] 재보정 완료: {r.energy_threshold:.0f}')
+                        except Exception:
+                            pass
+                        fail_count = 0
+
+                except sr.RequestError as e:
+                    print(f'[Voice] Google STT 오류 (네트워크?): {e}')
+                    time.sleep(2)  # 네트워크 일시 오류 시 잠시 대기
+
                 except Exception as e:
-                    print(f'[Voice] 오류: {e}')
+                    print(f'[Voice] 예상치 못한 오류: {e}')
 
     except Exception as e:
         print(f'[Voice] 마이크 오류: {e}')
@@ -683,10 +828,19 @@ def generate_frames():
         time.sleep(1 / 30)
 
 
+# 팝업 프로세스 관리
+_popup_process = None
+
+
 # 라우트
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/popup")
+def popup_view():
+    return render_template("popup.html")
 
 
 @app.route("/video_feed")
@@ -779,6 +933,18 @@ def api_overlay_toggle():
     return jsonify({"ok": True, "show": show_overlay})
 
 
+@app.route("/api/popup/toggle", methods=["POST"])
+def api_popup_toggle():
+    global _popup_process
+    if _popup_process and _popup_process.poll() is None:
+        _popup_process.terminate()
+        _popup_process = None
+        return jsonify({"popup": False})
+    launcher = os.path.join(os.path.dirname(os.path.abspath(__file__)), "popup_launcher.py")
+    _popup_process = subprocess.Popen([sys.executable, launcher, "5000"])
+    return jsonify({"popup": True})
+
+
 @app.route("/api/voice/toggle", methods=["POST"])
 def api_voice_toggle():
     global voice_running, voice_thread_obj, voice_mode
@@ -813,5 +979,5 @@ if __name__ == "__main__":
             voice_thread_obj.start()
 
     socketio.run(
-        app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True
+        app, host="0.0.0.0", port=5000, debug=True, use_reloader=False, allow_unsafe_werkzeug=True
     )

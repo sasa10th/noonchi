@@ -23,6 +23,8 @@ class WindowScreenCapturer:
         "Phone Link",     # Windows Link to Windows
         "SM-",            # 갤럭시 기기명 접두어 (SM-X710 등)
         "Galaxy Tab",     # 일부 앱이 기기명 그대로 표시
+        "Tab",
+        "무선 디스플레이",
     ]
 
     def __init__(self, window_keyword: str = None, window_keywords: list = None):

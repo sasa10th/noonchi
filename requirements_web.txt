@@ -1,0 +1,11 @@
+# 웹 버전 의존성 (OCR·카메라·음성 제거)
+flask>=3.0.0
+flask-socketio>=5.3.6
+numpy>=1.24.0
+pandas>=2.0.0
+joblib>=1.3.0
+scikit-learn>=1.3.0
+
+# 배포용 WSGI 서버 (WebSocket 지원)
+gunicorn
+eventlet

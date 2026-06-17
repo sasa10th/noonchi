@@ -1,11 +1,15 @@
 import os
+import sys
 
 import cv2
 
 
 class ScreenClassifier:
     def __init__(self, model_path: str | None = None):
-        base_dir = os.path.dirname(os.path.dirname(__file__))
+        if getattr(sys, 'frozen', False):
+            base_dir = sys._MEIPASS
+        else:
+            base_dir = os.path.dirname(os.path.dirname(__file__))
         self.model_path = model_path or os.path.normpath(
             os.path.join(base_dir, "screen_resnet18_best.pt")
         )

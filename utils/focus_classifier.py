@@ -40,10 +40,12 @@ class FocusClassifier:
             self._model_loaded = True
             return
         
-        model_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 
-            "user_state_rf.pkl"
-        )
+        import sys
+        if getattr(sys, 'frozen', False):
+            _base = sys._MEIPASS
+        else:
+            _base = os.path.dirname(os.path.dirname(__file__))
+        model_path = os.path.join(_base, "user_state_rf.pkl")
         
         try:
             model_data = joblib.load(model_path)
